@@ -1,0 +1,27 @@
+{
+  "name": "@gearzo/config",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.js"
+    },
+    "./eslint/base": "./src/eslint/base.js",
+    "./tailwind/preset": "./src/tailwind/preset.js",
+    "./tsconfig/base.json": "./src/tsconfig/base.json",
+    "./tsconfig/nestjs.json": "./src/tsconfig/nestjs.json",
+    "./tsconfig/react-native.json": "./src/tsconfig/react-native.json"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "typescript": "^5.7.0"
+  }
+}

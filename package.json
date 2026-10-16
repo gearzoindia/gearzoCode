@@ -1,0 +1,35 @@
+{
+  "name": "gearzo",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "dev:customer-api": "turbo run dev --filter=customer-api",
+    "dev:mechanic-api": "turbo run dev --filter=mechanic-api",
+    "dev:admin-api": "turbo run dev --filter=admin-api",
+    "dev:customer": "turbo run dev --filter=customer",
+    "dev:mechanic": "turbo run dev --filter=mechanic",
+    "dev:admin": "turbo run dev --filter=admin",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "db:generate": "pnpm --filter @gearzo/db generate",
+    "db:migrate:dev": "pnpm --filter @gearzo/db migrate:dev",
+    "db:migrate:deploy": "pnpm --filter @gearzo/db migrate:deploy",
+    "db:push": "pnpm --filter @gearzo/db db:push",
+    "db:studio": "pnpm --filter @gearzo/db studio",
+    "clean": "turbo run clean && rimraf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "prettier": "^3.4.0",
+    "rimraf": "^6.0.0",
+    "tailwindcss": "3.3.2",
+    "tsup": "^8.5.1",
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
+  }
+}

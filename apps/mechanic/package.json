@@ -1,0 +1,46 @@
+{
+  "name": "mechanic",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gearzo/api-client": "workspace:*",
+    "@gearzo/config": "workspace:*",
+    "@gearzo/schemas": "workspace:*",
+    "@gearzo/ui": "workspace:*",
+    "@hookform/resolvers": "^3.9.1",
+    "@react-navigation/native": "^7.0.0",
+    "@tanstack/react-query": "^5.62.0",
+    "axios": "^1.7.9",
+    "expo": "~52.0.0",
+    "expo-camera": "~16.0.0",
+    "expo-image-picker": "~16.0.0",
+    "expo-location": "~18.0.0",
+    "expo-notifications": "~0.29.0",
+    "expo-router": "~4.0.0",
+    "expo-secure-store": "~14.0.0",
+    "expo-task-manager": "~12.0.0",
+    "nativewind": "^2.0.11",
+    "react": "18.3.1",
+    "react-hook-form": "^7.54.0",
+    "react-native": "0.76.6",
+    "react-native-gesture-handler": "~2.20.2",
+    "react-native-maps": "1.18.0",
+    "react-native-reanimated": "~3.16.1",
+    "react-native-safe-area-context": "4.12.0",
+    "react-native-screens": "~4.4.0",
+    "tailwindcss": "^3.4.17",
+    "zod": "^3.24.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.12",
+    "typescript": "^5.7.0"
+  }
+}

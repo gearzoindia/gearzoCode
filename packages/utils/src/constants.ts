@@ -1,0 +1,99 @@
+export const AUDIENCES = {
+  CUSTOMER: 'CUSTOMER',
+  MECHANIC: 'MECHANIC',
+  ADMIN: 'ADMIN',
+} as const;
+
+export type Audience = (typeof AUDIENCES)[keyof typeof AUDIENCES];
+
+export const PLATFORMS = {
+  IOS: 'IOS',
+  ANDROID: 'ANDROID',
+  WEB: 'WEB',
+} as const;
+
+export type Platform = (typeof PLATFORMS)[keyof typeof PLATFORMS];
+
+export const BOOKING_STATUSES = {
+  DRAFT: 'DRAFT',
+  PENDING_PAYMENT: 'PENDING_PAYMENT',
+  BROADCASTING: 'BROADCASTING',
+  ASSIGNED: 'ASSIGNED',
+  MECHANIC_EN_ROUTE: 'MECHANIC_EN_ROUTE',
+  MECHANIC_ARRIVED: 'MECHANIC_ARRIVED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  CANCELLED_BY_CUSTOMER: 'CANCELLED_BY_CUSTOMER',
+  CANCELLED_BY_MECHANIC: 'CANCELLED_BY_MECHANIC',
+  CANCELLED_BY_SYSTEM: 'CANCELLED_BY_SYSTEM',
+  DISPUTED: 'DISPUTED',
+} as const;
+
+export type BookingStatus = (typeof BOOKING_STATUSES)[keyof typeof BOOKING_STATUSES];
+
+export const SERVICE_MODES = {
+  DOORSTEP: 'DOORSTEP',
+  PICKUP_DROP: 'PICKUP_DROP',
+  DRIVE_IN: 'DRIVE_IN',
+} as const;
+
+export type ServiceMode = (typeof SERVICE_MODES)[keyof typeof SERVICE_MODES];
+
+export const SCHEDULE_TYPES = {
+  INSTANT: 'INSTANT',
+  SCHEDULE: 'SCHEDULE',
+} as const;
+
+export type ScheduleType = (typeof SCHEDULE_TYPES)[keyof typeof SCHEDULE_TYPES];
+
+export const PAYMENT_METHODS = {
+  ONLINE: 'ONLINE',
+  CASH: 'CASH',
+  UPI_DIRECT: 'UPI_DIRECT',
+  WALLET: 'WALLET',
+} as const;
+
+export type PaymentMethod = (typeof PAYMENT_METHODS)[keyof typeof PAYMENT_METHODS];
+
+export const PAYMENT_STATUSES = {
+  PENDING: 'PENDING',
+  AUTHORIZED: 'AUTHORIZED',
+  CAPTURED: 'CAPTURED',
+  FAILED: 'FAILED',
+  REFUNDED: 'REFUNDED',
+  PARTIALLY_REFUNDED: 'PARTIALLY_REFUNDED',
+} as const;
+
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[keyof typeof PAYMENT_STATUSES];
+
+export const MECHANIC_ONBOARDING_STATUSES = {
+  REGISTERED: 'REGISTERED',
+  PROFILE_COMPLETED: 'PROFILE_COMPLETED',
+  SKILLS_COMPLETED: 'SKILLS_COMPLETED',
+  DOCUMENTS_UPLOADED: 'DOCUMENTS_UPLOADED',
+  BANK_ADDED: 'BANK_ADDED',
+  VERIFICATION_PENDING: 'VERIFICATION_PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  SUSPENDED: 'SUSPENDED',
+} as const;
+
+export type MechanicOnboardingStatus = (typeof MECHANIC_ONBOARDING_STATUSES)[keyof typeof MECHANIC_ONBOARDING_STATUSES];
+
+export const MECHANIC_PRESENCE_STATUSES = {
+  OFFLINE: 'OFFLINE',
+  ONLINE: 'ONLINE',
+  BUSY: 'BUSY',
+} as const;
+
+export type MechanicPresenceStatus = (typeof MECHANIC_PRESENCE_STATUSES)[keyof typeof MECHANIC_PRESENCE_STATUSES];
+
+export const ADMIN_ROLES = {
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  ADMIN: 'ADMIN',
+  OPERATIONS: 'OPERATIONS',
+  SUPPORT: 'SUPPORT',
+  FINANCE: 'FINANCE',
+} as const;
+
+export type AdminRole = (typeof ADMIN_ROLES)[keyof typeof ADMIN_ROLES];
