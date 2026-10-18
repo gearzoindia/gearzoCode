@@ -138,13 +138,15 @@ pnpm --filter customer web
 
 #### 2. Mechanic App (Web)
 ```powershell
-pnpm --filter mechanic web
+pnpm --filter mechanic web -- --port 8082
 ```
+- **URL:** [http://localhost:8082](http://localhost:8082)
 
 #### 3. Admin App (Web)
 ```powershell
-pnpm --filter admin web
+pnpm --filter admin web -- --port 8083
 ```
+- **URL:** [http://localhost:8083](http://localhost:8083)
 
 ---
 
