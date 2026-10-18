@@ -40,7 +40,72 @@ pnpm db:studio
 
 ---
 
-## 2. Running Backend APIs (NestJS)
+## 2. Environment Variables Setup (.env)
+
+The codebase keeps secret credentials and machine-specific configs out of version control. Each app and package contains a `.env.example` template.
+
+### A. Automatic Setup (Copy all `.env.example` files in one command)
+Run this in PowerShell from the project root (`d:\gearZoApp`):
+```powershell
+Get-ChildItem -Recurse -Filter ".env.example" | ForEach-Object {
+    $envPath = Join-Path $_.DirectoryName ".env"
+    if (-not (Test-Path $envPath)) {
+        Copy-Item $_.FullName $envPath
+        Write-Host "Created: $envPath" -ForegroundColor Green
+    } else {
+        Write-Host "Already exists: $envPath" -ForegroundColor Yellow
+    }
+}
+```
+
+### B. Summary of All Environment Files
+
+| Path | Purpose | Key Variables |
+|---|---|---|
+| **`packages/db/.env`** | Prisma CLI database connection | `DATABASE_URL` (Port `5433`) |
+| **`apps/customer-api/.env`** | Customer API server | `PORT=4001`, `DATABASE_URL`, `JWT_SECRET`, `OTP_PROVIDER=mock`, `RAZORPAY_*` |
+| **`apps/mechanic-api/.env`** | Mechanic API server | `PORT=4002`, `DATABASE_URL`, `JWT_SECRET`, `OTP_PROVIDER=mock` |
+| **`apps/admin-api/.env`** | Admin API server | `PORT=4003`, `DATABASE_URL`, `JWT_ACCESS_SECRET`, `TOTP_ENC_KEY` |
+| **`apps/customer/.env`** | Customer Mobile & Web app | `EXPO_PUBLIC_API_URL=http://localhost:4001/v1` |
+| **`apps/mechanic/.env`** | Mechanic Mobile & Web app | `EXPO_PUBLIC_API_URL=http://localhost:4002/v1` |
+| **`apps/admin/.env`** | Super Admin Web dashboard | `EXPO_PUBLIC_API_URL=http://localhost:4003/v1` |
+
+---
+
+### C. How to Add a New Environment Variable
+
+#### 1. In Backend APIs (NestJS)
+1. Add the variable to `.env` and `.env.example` in the respective API folder (e.g. `apps/customer-api/.env`):
+   ```env
+   MY_NEW_FEATURE_KEY="sample_value"
+   ```
+2. Open `packages/nest-common/src/config/env.schema.ts` and add validation to the Zod schema:
+   ```ts
+   MY_NEW_FEATURE_KEY: z.string().optional().default('default_value'),
+   ```
+3. Use it in any NestJS service or controller using `ConfigService`:
+   ```ts
+   constructor(private readonly configService: ConfigService) {}
+   
+   myMethod() {
+     const myKey = this.configService.get<string>('MY_NEW_FEATURE_KEY');
+   }
+   ```
+
+#### 2. In Frontend Apps (Expo / React Native / Next.js)
+1. Add the variable to `apps/customer/.env` or `apps/mechanic/.env`.
+   > ⚠️ **Important:** In Expo, any variable accessed in the client UI **must** be prefixed with `EXPO_PUBLIC_`:
+   ```env
+   EXPO_PUBLIC_MAPS_API_KEY="AIzaSyYourKeyHere"
+   ```
+2. Read it directly in any React component or hook:
+   ```tsx
+   const apiKey = process.env.EXPO_PUBLIC_MAPS_API_KEY;
+   ```
+
+---
+
+## 3. Running Backend APIs (NestJS)
 
 Open terminal windows in `d:\gearZoApp` for the services you want to run:
 
@@ -59,7 +124,7 @@ pnpm dev
 
 ---
 
-## 3. Running Frontend Applications (Expo / React Native)
+## 4. Running Frontend Applications (Expo / React Native)
 
 ### A. Run in Web Browser (Fastest for testing)
 
@@ -101,7 +166,7 @@ pnpm --filter admin web
 
 ---
 
-## 4. Test Credentials & Authentication
+## 5. Test Credentials & Authentication
 
 ### Customer Phone Authentication
 - **Phone Number:** Any 10-digit number (e.g., `9876543210`)
@@ -114,7 +179,7 @@ pnpm --filter admin web
 
 ---
 
-## 5. Where & How to Check Logs
+## 6. Where & How to Check Logs
 
 ### A. PostgreSQL Database Logs (Docker)
 To view PostgreSQL startup logs, queries, connections, or errors:
@@ -165,7 +230,7 @@ pnpm --filter customer-api dev
 
 ---
 
-## 6. Troubleshooting & Common Issues
+## 7. Troubleshooting & Common Issues
 
 ### 1. `MIME type ('application/json') is not executable` or Web PostCSS Error
 If Metro crashes with a PostCSS or NativeWind error during web bundling:
