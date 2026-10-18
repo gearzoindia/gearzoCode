@@ -114,7 +114,58 @@ pnpm --filter admin web
 
 ---
 
-## 5. Troubleshooting & Common Issues
+## 5. Where & How to Check Logs
+
+### A. PostgreSQL Database Logs (Docker)
+To view PostgreSQL startup logs, queries, connections, or errors:
+```powershell
+# View recent database logs
+docker logs --tail 100 gearzo-db
+
+# Follow database logs in real time
+docker logs -f gearzo-db
+```
+*Alternatively:* Open **Docker Desktop** -> click **Containers** -> select **`gearzo-db`** -> view the **Logs** tab.
+
+---
+
+### B. Backend API Logs (NestJS)
+When running `pnpm --filter customer-api dev` (or `mechanic-api` / `admin-api`), NestJS outputs logs directly to that terminal window:
+- **Routes & Startup:** Logged via `[RoutesResolver]` and `[RouterExplorer]`.
+- **HTTP Requests & Durations:** Captured by `LoggingInterceptor` (`[LoggingInterceptor] GET /v1/customer/vehicles 200 - 14ms`).
+- **Exceptions & Errors:** Formatted with stack traces by `GlobalExceptionFilter`.
+
+**To save API output to a log file while watching:**
+```powershell
+pnpm --filter customer-api dev | Tee-Object -FilePath "customer-api.log"
+```
+
+**To view Prisma SQL queries executed by the API:**
+```powershell
+$env:DEBUG="prisma:query"
+pnpm --filter customer-api dev
+```
+
+---
+
+### C. Frontend Web App Logs (Customer & Mechanic)
+1. **Browser Developer Tools (Most Detailed):**
+   - Open [http://localhost:8081](http://localhost:8081) or [http://localhost:8082](http://localhost:8082).
+   - Press **`F12`** (or `Ctrl + Shift + I` / Right-click -> *Inspect*).
+   - Go to the **Console** tab for React errors, Redux/Zustand state, and warnings.
+   - Go to the **Network** tab (filter by `Fetch/XHR`) to see exact API URLs, headers, payload bodies, and JSON responses.
+2. **Metro Bundler Terminal:**
+   - The terminal running `pnpm --filter customer web` prints bundle build status, syntax errors, and web bundle time.
+
+---
+
+### D. Frontend Mobile App Logs (Expo Go on Physical Phone / Emulator)
+- **Terminal:** Expo streams React Native `console.log()` statements directly to the terminal running `pnpm --filter customer start`.
+- **In-App Developer Menu:** Shake your device (or press `Ctrl + M` on Android emulator / `Cmd + D` on iOS simulator) to open the Expo Dev Menu, then select **Show Performance Monitor** or debug options.
+
+---
+
+## 6. Troubleshooting & Common Issues
 
 ### 1. `MIME type ('application/json') is not executable` or Web PostCSS Error
 If Metro crashes with a PostCSS or NativeWind error during web bundling:
