@@ -109,7 +109,7 @@ export default function JurisdictionsScreen() {
             </View>
           </Card>
         )}
-      </ScrollView>
+      />
     </SafeAreaView>
   );
 }
