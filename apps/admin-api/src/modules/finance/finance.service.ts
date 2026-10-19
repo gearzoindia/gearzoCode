@@ -398,4 +398,36 @@ export class FinanceService {
       message: 'Ledger adjustment posted successfully',
     };
   }
+
+  async findAllRefunds(query: any, scope?: any) {
+    try {
+      const refunds = await this.prisma.refund.findMany({
+        include: {
+          payment: {
+            include: {
+              booking: {
+                include: {
+                  customer: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: query?.limit ? Number(query.limit) : 50,
+      });
+
+      return refunds.map((r) => ({
+        id: r.id,
+        bookingId: r.payment?.booking?.code || r.payment?.bookingId || 'GZ-REF',
+        customerName: r.payment?.booking?.customer?.name || 'Customer',
+        amountPaise: r.amountPaise,
+        reason: r.reason || 'Customer refund',
+        status: r.status,
+        date: r.createdAt.toISOString(),
+      }));
+    } catch {
+      return [];
+    }
+  }
 }

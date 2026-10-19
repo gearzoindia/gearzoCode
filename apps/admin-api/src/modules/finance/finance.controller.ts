@@ -33,9 +33,17 @@ import { Request } from 'express';
 @ApiTags('Finance')
 @ApiBearerAuth()
 @UseGuards(AdminAuthGuard, PermissionsGuard, JurisdictionScopeGuard, ReAuthGuard)
-@Controller()
+@Controller(['finance', ''])
 export class FinanceController {
   constructor(private readonly financeService: FinanceService) {}
+
+  @Get('refunds')
+  @Permissions('REFUND_APPROVE')
+  @ApiOperation({ summary: 'List customer refunds and adjustments' })
+  async findAllRefunds(@Query() query: any, @Req() req: Request) {
+    const scope = (req as any).jurisdictionScope;
+    return this.financeService.findAllRefunds(query, scope);
+  }
 
   @Post('refunds')
   @RequireReAuth()
