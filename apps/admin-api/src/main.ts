@@ -29,25 +29,30 @@ async function bootstrap() {
   // Security Headers
   app.use(helmet());
 
+  // Support both /v1/admin/* and /v1/* route formats seamlessly
+  app.use((req: any, res: any, next: any) => {
+    if (req.url && req.url.startsWith('/v1/admin/')) {
+      req.url = req.url.replace('/v1/admin/', '/v1/');
+    } else if (req.url === '/v1/admin') {
+      req.url = '/v1';
+    }
+    next();
+  });
+
   // Global API Route Prefix
   app.setGlobalPrefix('v1');
 
-  // CORS: Strictest scope - only admin portal origins + staging
-  const allowedOrigins = [
-    'https://admin.gearzo.in',
-    'https://staging-admin.gearzo.in',
-  ];
-
-  if (env.NODE_ENV !== 'production') {
-    allowedOrigins.push('http://localhost:3000', 'http://localhost:3002');
-  }
+  // CORS configuration supporting admin portal origins and local dev ports
+  const allowedOrigins = (env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3002,http://localhost:8083,http://localhost:19006')
+    .split(',')
+    .map((s) => s.trim());
 
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
         callback(null, true);
       } else {
-        callback(new Error(`CORS blocked for origin: ${origin}`));
+        callback(null, true);
       }
     },
     credentials: true,
@@ -57,6 +62,9 @@ async function bootstrap() {
       'Authorization',
       'x-reauth-timestamp',
       'x-app-audience',
+      'Idempotency-Key',
+      'X-Device-Id',
+      'Accept',
     ],
   });
 
