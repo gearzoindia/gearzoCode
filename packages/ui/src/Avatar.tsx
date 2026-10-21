@@ -4,18 +4,23 @@ import { View, Text, Image, StyleProp, ViewStyle } from 'react-native';
 export interface AvatarProps {
   name?: string;
   source?: { uri: string };
-  size?: number;
+  size?: number | 'sm' | 'md' | 'lg' | 'xl';
   style?: StyleProp<ViewStyle>;
 }
 
 export const Avatar: React.FC<AvatarProps> = ({
   name = 'User',
   source,
-  size = 44,
+  size: sizeProp = 44,
   style,
 }) => {
-  const initials = name
+  const sizeMap: Record<string, number> = { sm: 32, md: 44, lg: 56, xl: 72 };
+  const size = typeof sizeProp === 'number' ? sizeProp : (sizeMap[sizeProp] || 44);
+
+  const safeName = (name && name.trim()) || 'User';
+  const initials = safeName
     .split(' ')
+    .filter(Boolean)
     .map((part) => part.charAt(0))
     .join('')
     .slice(0, 2)
@@ -32,7 +37,7 @@ export const Avatar: React.FC<AvatarProps> = ({
             borderRadius: size / 2,
             backgroundColor: '#E5E7EB',
           },
-          style,
+          style as any,
         ]}
       />
     );

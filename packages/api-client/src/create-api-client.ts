@@ -1,11 +1,11 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import { useAuthStore, isLikelyJwt } from './auth-store';
 
 interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
 async function refreshTokens(instance: AxiosInstance, audience: string): Promise<void> {
-  const { useAuthStore } = await import('./auth-store');
   const refreshToken = useAuthStore.getState().refreshToken;
   if (!refreshToken) {
     await useAuthStore.getState().signOut();
@@ -13,15 +13,20 @@ async function refreshTokens(instance: AxiosInstance, audience: string): Promise
   }
 
   try {
-    const res = await axios.post<{ accessToken: string; refreshToken?: string }>(
+    const res = await axios.post(
       `${instance.defaults.baseURL}/auth/refresh`,
       { refreshToken, audience },
       { headers: { 'Content-Type': 'application/json' } }
     );
 
+    const payload = (res.data as any)?.data || res.data;
+    if (!payload?.accessToken) {
+      throw new Error('Refresh response missing access token');
+    }
+
     await useAuthStore.getState().setTokens({
-      accessToken: res.data.accessToken,
-      refreshToken: res.data.refreshToken || refreshToken,
+      accessToken: payload.accessToken,
+      refreshToken: payload.refreshToken || refreshToken,
     });
   } catch (error) {
     await useAuthStore.getState().signOut();
@@ -39,41 +44,52 @@ export function createApiClient({ baseURL, audience }: { baseURL: string; audien
   });
 
   // Request interceptor: attach Authorization: Bearer <access>
-  instance.interceptors.request.use(async (config) => {
-    const { useAuthStore } = await import('./auth-store');
+  instance.interceptors.request.use((config) => {
     const token = useAuthStore.getState().accessToken;
-    if (token) {
+    if (token && isLikelyJwt(token)) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   });
 
-  // Response interceptor: on TOKEN_EXPIRED -> single in-flight refresh -> retry
+  // Response interceptor: on 401 Unauthorized or TOKEN_EXPIRED -> single in-flight refresh -> retry
   let refreshPromise: Promise<void> | null = null;
   instance.interceptors.response.use(
     (res) => res,
     async (error) => {
       const originalRequest = error.config as ExtendedAxiosRequestConfig;
+      const status = error.response?.status;
       const errorCode = error.response?.data?.error?.code;
+      const isAuthRefresh = originalRequest?.url?.includes('/auth/refresh');
 
-      if (errorCode === 'TOKEN_EXPIRED' && !originalRequest._retry) {
+      if ((status === 401 || errorCode === 'TOKEN_EXPIRED') && !originalRequest?._retry && !isAuthRefresh) {
         originalRequest._retry = true;
-        if (!refreshPromise) {
-          refreshPromise = refreshTokens(instance, audience).finally(() => {
-            refreshPromise = null;
-          });
+        const currentRefreshToken = useAuthStore.getState().refreshToken;
+
+        if (currentRefreshToken) {
+          try {
+            if (!refreshPromise) {
+              refreshPromise = refreshTokens(instance, audience).finally(() => {
+                refreshPromise = null;
+              });
+            }
+            await refreshPromise;
+            const newToken = useAuthStore.getState().accessToken;
+            if (newToken) {
+              originalRequest.headers = originalRequest.headers || {};
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              return instance(originalRequest);
+            }
+          } catch (refreshErr) {
+            await useAuthStore.getState().signOut();
+            return Promise.reject(refreshErr);
+          }
+        } else {
+          await useAuthStore.getState().signOut();
         }
-        await refreshPromise;
-        const { useAuthStore } = await import('./auth-store');
-        const newToken = useAuthStore.getState().accessToken;
-        if (newToken) {
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        }
-        return instance(originalRequest);
       }
 
       if (errorCode === 'SESSION_REVOKED' || errorCode === 'SESSION_EXPIRED') {
-        const { useAuthStore } = await import('./auth-store');
         await useAuthStore.getState().signOut();
       }
 

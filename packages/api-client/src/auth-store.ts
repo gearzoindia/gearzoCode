@@ -7,11 +7,19 @@ const ACCESS_TOKEN_KEY = 'gearzo_access_token';
 const REFRESH_TOKEN_KEY = 'gearzo_refresh_token';
 const USER_KEY = 'gearzo_user_profile';
 
+function getWebLocalStorage(): any {
+  if (typeof globalThis !== 'undefined' && (globalThis as any).localStorage) {
+    return (globalThis as any).localStorage;
+  }
+  return null;
+}
+
 async function setSecureItem(key: string, value: string): Promise<void> {
   try {
     if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(key, value);
+      const storage = getWebLocalStorage();
+      if (storage) {
+        storage.setItem(key, value);
       }
     } else {
       await SecureStore.setItemAsync(key, value);
@@ -24,23 +32,25 @@ async function setSecureItem(key: string, value: string): Promise<void> {
 async function getSecureItem(key: string): Promise<string | null> {
   try {
     if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem(key);
+      const storage = getWebLocalStorage();
+      if (storage) {
+        return storage.getItem(key);
       }
       return null;
     }
     return await SecureStore.getItemAsync(key);
   } catch (error) {
     console.warn(`Failed to retrieve ${key}:`, error);
-    return null;
   }
+  return null;
 }
 
 async function removeSecureItem(key: string): Promise<void> {
   try {
     if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.removeItem(key);
+      const storage = getWebLocalStorage();
+      if (storage) {
+        storage.removeItem(key);
       }
     } else {
       await SecureStore.deleteItemAsync(key);
@@ -64,7 +74,13 @@ export interface AuthState {
   setUser: (user: UserProfile) => void;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export function isLikelyJwt(token: string | null | undefined): boolean {
+  if (!token || typeof token !== 'string') return false;
+  const parts = token.split('.');
+  return parts.length === 3 && parts.every((p) => p.length > 0);
+}
+
+export const useAuthStore = create<AuthState>((set) => ({
   status: 'loading',
   user: null,
   accessToken: null,
@@ -77,9 +93,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const storedUser = await getSecureItem(USER_KEY);
       const user = storedUser ? (JSON.parse(storedUser) as UserProfile) : null;
 
+      const validAccessToken = isLikelyJwt(storedAccessToken) ? storedAccessToken : null;
+      if (storedAccessToken && !validAccessToken) {
+        await removeSecureItem(ACCESS_TOKEN_KEY);
+      }
+
       if (storedRefreshToken) {
         set({
-          accessToken: storedAccessToken || (storedRefreshToken ? storedRefreshToken.replace('refresh', 'access') : null),
+          accessToken: validAccessToken,
           refreshToken: storedRefreshToken,
           user,
           status: 'signedIn',

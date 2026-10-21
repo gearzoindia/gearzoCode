@@ -9,41 +9,13 @@ export default function AdminCustomersIndex() {
   const router = useRouter();
   const [search, setSearch] = useState('');
 
-  const { data: customers, isLoading } = useAdminCustomers(search || undefined);
-
-  const mockCustomers = customers || [
-    {
-      id: 'cust-1',
-      name: 'Anand Verma',
-      phone: '+91 98765 43210',
-      email: 'anand.verma@example.com',
-      totalBookings: 8,
-      totalSpentPaise: 1120000,
-      createdAt: '2025-11-12T00:00:00Z',
-    },
-    {
-      id: 'cust-2',
-      name: 'Priya Rajan',
-      phone: '+91 98111 22334',
-      email: 'priya.r@example.com',
-      totalBookings: 3,
-      totalSpentPaise: 385000,
-      createdAt: '2026-02-04T00:00:00Z',
-    },
-    {
-      id: 'cust-3',
-      name: 'Karthik Somani',
-      phone: '+91 97410 55667',
-      email: 'karthik.s@example.com',
-      totalBookings: 1,
-      totalSpentPaise: 149900,
-      createdAt: '2026-06-18T00:00:00Z',
-    },
-  ];
+  const { data: customers, isLoading, isError, refetch } = useAdminCustomers(search || undefined);
 
   if (isLoading) {
     return <LoadingScreen message="Loading customers registry..." />;
   }
+
+  const displayCustomers = Array.isArray(customers) ? customers : [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -65,27 +37,45 @@ export default function AdminCustomersIndex() {
       </View>
 
       <FlatList
-        data={mockCustomers}
+        data={displayCustomers}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
-        renderItem={({ item }) => (
-          <Card variant="default" style={styles.card}>
-            <TouchableOpacity
-              onPress={() => router.push(`/customers/${item.id}`)}
-              style={styles.row}
-            >
-              <Avatar name={item.name} size="md" />
-              <View style={{ flex: 1, marginLeft: 14 }}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.phone}>{item.phone} • {item.email || 'No email'}</Text>
-                <Text style={styles.meta}>
-                  {item.totalBookings} orders • Total spent ₹{(item.totalSpentPaise / 100).toLocaleString('en-IN')}
-                </Text>
-              </View>
-              <Text style={{ fontSize: 20, color: '#94A3B8' }}>›</Text>
-            </TouchableOpacity>
-          </Card>
-        )}
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', padding: 40 }}>
+            <Text style={{ fontSize: 32, marginBottom: 12 }}>👥</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
+              {isError ? 'Unable to load customers' : 'No Customers Found'}
+            </Text>
+            <Text style={{ fontSize: 13, color: '#64748B', marginTop: 4, textAlign: 'center' }}>
+              {isError
+                ? 'Could not connect to the customers service. Please check API server.'
+                : search
+                ? 'No customers matching your search criteria.'
+                : 'No customer accounts registered in the database yet.'}
+            </Text>
+          </View>
+        }
+        renderItem={({ item }) => {
+          const customerName = item.name || item.phone || 'Customer';
+          return (
+            <Card variant="default" style={styles.card}>
+              <TouchableOpacity
+                onPress={() => router.push(`/customers/${item.id}`)}
+                style={styles.row}
+              >
+                <Avatar name={customerName} size="md" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text style={styles.name}>{customerName}</Text>
+                  <Text style={styles.phone}>{item.phone} • {item.email || 'No email registered'}</Text>
+                  <Text style={styles.meta}>
+                    {item.totalBookings} orders • Total spent ₹{(item.totalSpentPaise / 100).toLocaleString('en-IN')}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 20, color: '#94A3B8' }}>›</Text>
+              </TouchableOpacity>
+            </Card>
+          );
+        }}
       />
     </SafeAreaView>
   );

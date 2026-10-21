@@ -27,7 +27,15 @@ export default function AdminLoginScreen() {
         password,
       });
 
-      if (response.requiresTotp && response.tempToken) {
+      if (response.challengeId) {
+        router.push({
+          pathname: '/(auth)/otp',
+          params: {
+            challengeId: response.challengeId,
+            maskedPhone: response.maskedPhone || '',
+          },
+        });
+      } else if (response.requiresTotp && response.tempToken) {
         router.push({
           pathname: '/(auth)/totp',
           params: { tempToken: response.tempToken },
@@ -36,13 +44,8 @@ export default function AdminLoginScreen() {
         router.replace('/(app)/dashboard');
       }
     } catch (err: unknown) {
-      // In demo mode, fallback route to dashboard
       const error = err as { response?: { data?: { message?: string } } };
-      if (email.includes('@')) {
-        router.replace('/(app)/dashboard');
-      } else {
-        setErrorMsg(error?.response?.data?.message || 'Invalid administrator credentials.');
-      }
+      setErrorMsg(error?.response?.data?.message || 'Invalid administrator credentials.');
     }
   };
 

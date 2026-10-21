@@ -67,6 +67,28 @@ export class AdminsService {
     );
   }
 
+  async findOne(id: string, currentAdmin: AuthenticatedAdmin, scope: JurisdictionScopeContext) {
+    const admin = await this.prisma.admin.findUnique({
+      where: { id },
+      include: {
+        jurisdiction: { select: { id: true, name: true, level: true } },
+        creator: { select: { id: true, name: true, role: true } },
+        permissionOverrides: true,
+      },
+    });
+
+    if (!admin) {
+      throw new NotFoundException(`Administrator not found: ${id}`);
+    }
+
+    const currentRank = ROLE_RANK[currentAdmin.role] || 0;
+    if (!scope.isSuperAdmin && (ROLE_RANK[admin.role] || 0) >= currentRank && admin.id !== currentAdmin.id) {
+      throw new ForbiddenException('Cannot inspect higher or equal rank administrator');
+    }
+
+    return admin;
+  }
+
   async invite(dto: InviteAdminDto, currentAdmin: AuthenticatedAdmin, scope: JurisdictionScopeContext) {
     const currentRank = ROLE_RANK[currentAdmin.role] || 0;
     const targetRank = ROLE_RANK[dto.role] || 0;

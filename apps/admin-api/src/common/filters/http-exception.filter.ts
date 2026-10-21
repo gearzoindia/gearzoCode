@@ -17,13 +17,18 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const status =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+    const isHttp =
+      exception instanceof HttpException ||
+      (typeof (exception as any)?.getStatus === 'function');
+
+    const status = isHttp
+      ? (exception as any).getStatus()
+      : ((exception as any)?.status || HttpStatus.INTERNAL_SERVER_ERROR);
 
     const exceptionResponse =
-      exception instanceof HttpException ? exception.getResponse() : null;
+      isHttp && typeof (exception as any)?.getResponse === 'function'
+        ? (exception as any).getResponse()
+        : null;
 
     let message = 'Internal server error';
     let errors: any = null;

@@ -7,7 +7,7 @@ import { Permissions } from '../../../common/decorators';
 @ApiTags('Super Admin - System Health')
 @ApiBearerAuth()
 @UseGuards(AdminAuthGuard, PermissionsGuard)
-@Controller('system-health')
+@Controller(['system-health', 'system/health', 'admin/system/health'])
 export class SystemHealthController {
   constructor(private readonly systemHealthService: SystemHealthService) {}
 

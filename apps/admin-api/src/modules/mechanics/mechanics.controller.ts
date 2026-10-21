@@ -34,7 +34,7 @@ export class MechanicsController {
     return this.mechanicsService.findAll(dto, scope);
   }
 
-  @Get('kyc-queue')
+  @Get(['kyc-queue', 'kyc/queue'])
   @Permissions('MECHANIC_KYC_REVIEW')
   @ApiOperation({ summary: 'Get KYC verification queue (oldest first)' })
   async getKycQueue(@Req() req: Request) {

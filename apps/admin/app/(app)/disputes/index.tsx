@@ -7,30 +7,9 @@ import { Card, Badge, EmptyState, LoadingScreen } from '@gearzo/ui';
 
 export default function AdminDisputesIndex() {
   const router = useRouter();
-  const { data: disputes, isLoading, refetch, isRefetching } = useAdminDisputes();
+  const { data: disputes, isLoading, isError, refetch, isRefetching } = useAdminDisputes();
 
-  const mockDisputes = disputes || [
-    {
-      id: 'disp-101',
-      bookingId: 'GZ-88092',
-      customerName: 'Kavita Nair',
-      mechanicName: 'Ramesh Kumar',
-      reason: 'Mechanic left oil stains on driveway and did not tighten rear drum brake cable.',
-      status: 'OPEN' as const,
-      amountPaise: 149900,
-      createdAt: '2026-10-12T10:00:00Z',
-    },
-    {
-      id: 'disp-102',
-      bookingId: 'GZ-87980',
-      customerName: 'Rahul Mehra',
-      mechanicName: 'Suresh Mani',
-      reason: 'Extra battery clamp was billed twice on doorstep invoice.',
-      status: 'OPEN' as const,
-      amountPaise: 45000,
-      createdAt: '2026-10-11T14:30:00Z',
-    },
-  ];
+  const displayDisputes = Array.isArray(disputes) ? disputes : [];
 
   if (isLoading && !isRefetching) {
     return <LoadingScreen message="Loading disputes inbox..." />;
@@ -43,11 +22,11 @@ export default function AdminDisputesIndex() {
           <Text style={styles.title}>Disputes & Escalations</Text>
           <Text style={styles.sub}>Customer complaints, quality audits & chargebacks</Text>
         </View>
-        <Badge label={`${mockDisputes.length} OPEN`} variant="error" />
+        <Badge label={`${displayDisputes.length} OPEN`} variant="error" />
       </View>
 
       <FlatList
-        data={mockDisputes}
+        data={displayDisputes}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
         renderItem={({ item }) => (

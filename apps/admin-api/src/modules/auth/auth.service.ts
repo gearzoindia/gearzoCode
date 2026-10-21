@@ -61,9 +61,14 @@ export class AuthService {
   async login(dto: LoginDto, ip: string, userAgent?: string) {
     this.cleanExpiredChallenges();
 
+    const idVal = (dto.identifier || dto.email || '').trim();
+    if (!idVal) {
+      throw new UnauthorizedException('Identifier or email is required');
+    }
+
     const admin = await this.prisma.admin.findFirst({
       where: {
-        OR: [{ email: dto.identifier.toLowerCase() }, { phone: dto.identifier }],
+        OR: [{ email: idVal.toLowerCase() }, { phone: idVal }],
       },
     });
 
@@ -299,7 +304,7 @@ export class AuthService {
   private async createAuthSession(admin: any, ip: string, userAgent?: string) {
     const session = await this.sessionService.createSession(
       admin.id,
-      'admin',
+      'ADMIN',
       'Web Dashboard',
       ip,
       userAgent,

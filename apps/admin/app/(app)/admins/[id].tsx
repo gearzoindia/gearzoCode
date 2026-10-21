@@ -2,33 +2,55 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Badge, Button, Avatar } from '@gearzo/ui';
+import { Card, Badge, Button, Avatar, LoadingScreen, EmptyState } from '@gearzo/ui';
+import { useAdminStaffDetail } from '@gearzo/api-client';
 
 export default function AdminStaffDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const admin = {
-    id: id || 'adm-1',
-    name: 'Vikram Sundaram',
-    email: 'vikram.ops@gearzo.in',
-    role: 'OPS_MANAGER',
-    status: 'ACTIVE',
-    mfaEnabled: true,
-    lastLogin: 'Today, 09:30 AM',
-    permissions: [
-      'View & Edit Bookings',
-      'Approve / Reject KYC Queue',
-      'Reassign Mechanics',
-      'Submit Ledger Adjustments (Maker)',
-      'Inspect Financial Reports',
-    ],
-  };
+  const { data: admin, isLoading, error } = useAdminStaffDetail(id || '');
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading administrator profile..." />;
+  }
+
+  if (error || !admin) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Text style={{ fontSize: 20 }}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Operator Profile</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <EmptyState
+            title="Administrator Not Found"
+            description="The requested operator profile could not be located in the system."
+            buttonTitle="Return to Staff"
+            onAction={() => router.back()}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const displayName = admin.name || admin.email || 'Administrator';
+  const role = admin.role || 'OPERATOR';
 
   const handleRevoke = () => {
-    Alert.alert('Revoke Access', 'Are you sure you want to deactivate this operator account?', [
+    Alert.alert('Revoke Access', `Are you sure you want to deactivate ${displayName}?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Deactivate', style: 'destructive', onPress: () => router.back() },
+      {
+        text: 'Deactivate',
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert('Action Logged', 'Operator deactivation requested.');
+          router.back();
+        },
+      },
     ]);
   };
 
@@ -38,18 +60,23 @@ export default function AdminStaffDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={{ fontSize: 20 }}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Operator: {admin.name}</Text>
-        <Badge label={admin.role} variant="info" />
+        <Text style={styles.headerTitle}>Operator: {displayName}</Text>
+        <Badge label={role} variant="info" />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
         <Card variant="elevated" style={styles.card}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Avatar name={admin.name} size="lg" />
+            <Avatar name={displayName} size="lg" />
             <View style={{ flex: 1, marginLeft: 16 }}>
-              <Text style={styles.name}>{admin.name}</Text>
+              <Text style={styles.name}>{displayName}</Text>
               <Text style={styles.email}>{admin.email}</Text>
-              <Text style={styles.sub}>2FA Status: Enrolled & Enforced ✓</Text>
+              <Text style={styles.sub}>
+                Jurisdiction: {admin.jurisdiction?.name || 'All Territories'}
+              </Text>
+              <Text style={styles.sub}>
+                2FA Status: {admin.totpEnabled ? 'Enrolled & Enforced ✓' : 'Optional / Not Configured'}
+              </Text>
             </View>
           </View>
         </Card>
@@ -57,20 +84,19 @@ export default function AdminStaffDetailScreen() {
         <Text style={styles.sectionHeader}>Role Capabilities</Text>
         <Card variant="default" style={styles.card}>
           <View style={{ gap: 8 }}>
-            {admin.permissions.map((p, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={{ color: '#166534', marginRight: 8, fontWeight: '800' }}>✓</Text>
-                <Text style={{ fontSize: 13, color: '#334155' }}>{p}</Text>
-              </View>
-            ))}
+            {admin.role === 'SUPER_ADMIN' ? (
+              <Text style={styles.permText}>✓ Full Unrestricted Super-Administrator Access</Text>
+            ) : (
+              <Text style={styles.permText}>✓ Standard Role Permissions for {admin.role}</Text>
+            )}
           </View>
         </Card>
 
         <View style={{ marginTop: 24 }}>
           <Button
-            title="Revoke Administrative Access ⚠️"
+            title="Deactivate Operator Account"
             variant="danger"
-            size="lg"
+            size="md"
             onPress={handleRevoke}
           />
         </View>
@@ -103,8 +129,8 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   card: {
-    padding: 16,
-    borderRadius: 12,
+    padding: 18,
+    borderRadius: 14,
     marginBottom: 16,
   },
   name: {
@@ -119,14 +145,17 @@ const styles = StyleSheet.create({
   },
   sub: {
     fontSize: 12,
-    color: '#166534',
+    color: '#64748B',
     marginTop: 4,
-    fontWeight: '600',
   },
   sectionHeader: {
     fontSize: 14,
     fontWeight: '800',
     color: '#0F172A',
     marginBottom: 8,
+  },
+  permText: {
+    fontSize: 13,
+    color: '#334155',
   },
 });

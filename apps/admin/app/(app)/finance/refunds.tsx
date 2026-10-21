@@ -7,28 +7,9 @@ import { useAdminRefunds } from '@gearzo/api-client';
 
 export default function AdminRefundsScreen() {
   const router = useRouter();
-  const { data: refunds } = useAdminRefunds();
+  const { data: refunds, isError } = useAdminRefunds();
 
-  const mockRefunds = [
-    {
-      id: 'ref-901',
-      bookingId: 'GZ-88092',
-      customerName: 'Kavita Nair',
-      amountPaise: 149900,
-      reason: 'Dispute settlement - quality dissatisfaction',
-      status: 'PROCESSED',
-      date: '12 Oct 2026, 04:15 PM',
-    },
-    {
-      id: 'ref-902',
-      bookingId: 'GZ-87501',
-      customerName: 'Arjun Das',
-      amountPaise: 49900,
-      reason: 'Mechanic unavailable within dispatch ETA',
-      status: 'PROCESSED',
-      date: '11 Oct 2026, 11:30 AM',
-    },
-  ];
+  const displayRefunds = Array.isArray(refunds) ? refunds : [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -40,9 +21,18 @@ export default function AdminRefundsScreen() {
       </View>
 
       <FlatList
-        data={mockRefunds}
+        data={displayRefunds}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', padding: 40 }}>
+            <Text style={{ fontSize: 32, marginBottom: 12 }}>🧾</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>No Refunds or Adjustments</Text>
+            <Text style={{ fontSize: 13, color: '#64748B', marginTop: 4, textAlign: 'center' }}>
+              No refund claims or payment adjustments have been processed.
+            </Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <Card variant="default" style={styles.card}>
             <View style={styles.topRow}>

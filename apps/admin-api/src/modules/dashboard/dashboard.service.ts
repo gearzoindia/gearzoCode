@@ -111,13 +111,49 @@ export class DashboardService {
       period: { from: from.toISOString(), to: to.toISOString() },
       metrics: {
         totalBookings,
+        totalBookingsToday: totalBookings,
         activeBookings,
         totalRevenuePaise,
+        revenueTodayPaise: totalRevenuePaise,
         onlineMechanics,
+        activeMechanicsCount: onlineMechanics,
         pendingKycCount,
         openDisputes,
+        openDisputesCount: openDisputes,
       },
+      totalBookingsToday: totalBookings,
+      activeMechanicsCount: onlineMechanics,
+      revenueTodayPaise: totalRevenuePaise,
+      openDisputesCount: openDisputes,
+      pendingKycCount,
     };
+  }
+
+  async getLiveMap(dto: LiveMapDto, scope: JurisdictionScopeContext) {
+    const [mechanics, bookings] = await Promise.all([
+      this.getLiveMechanics(dto, scope),
+      this.getLiveBookings(dto, scope),
+    ]);
+
+    const mechEntities = mechanics.map((m) => ({
+      id: m.mechanicId,
+      name: `${m.name} (Mechanic)`,
+      type: 'mechanic' as const,
+      latitude: m.lat || 12.9716,
+      longitude: m.lng || 77.5946,
+      status: m.status,
+    }));
+
+    const bookingEntities = bookings.map((b) => ({
+      id: b.id,
+      name: `Job #${b.code || b.id.slice(0, 8)}`,
+      type: 'customer' as const,
+      latitude: b.lat || 12.9698,
+      longitude: b.lng || 77.7499,
+      status: b.status,
+    }));
+
+    return [...mechEntities, ...bookingEntities];
   }
 
   async getLiveMechanics(dto: LiveMapDto, scope: JurisdictionScopeContext) {

@@ -2,37 +2,18 @@ import React from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Badge, Button, Avatar } from '@gearzo/ui';
+import { Card, Badge, Button, Avatar, LoadingScreen } from '@gearzo/ui';
+import { useAdminStaffList } from '@gearzo/api-client';
 
 export default function AdminsListScreen() {
   const router = useRouter();
+  const { data: staff, isLoading, isError } = useAdminStaffList();
 
-  const admins = [
-    {
-      id: 'adm-1',
-      name: 'Praveen Rao',
-      email: 'praveen@gearzo.in',
-      role: 'SUPER_ADMIN',
-      status: 'ACTIVE',
-      lastLogin: 'Today, 10:14 AM',
-    },
-    {
-      id: 'adm-2',
-      name: 'Vikram Sundaram',
-      email: 'vikram.ops@gearzo.in',
-      role: 'OPS_MANAGER',
-      status: 'ACTIVE',
-      lastLogin: 'Today, 09:30 AM',
-    },
-    {
-      id: 'adm-3',
-      name: 'Priya Sharma',
-      email: 'priya.support@gearzo.in',
-      role: 'SUPPORT_EXECUTIVE',
-      status: 'ACTIVE',
-      lastLogin: 'Yesterday, 05:45 PM',
-    },
-  ];
+  if (isLoading) {
+    return <LoadingScreen message="Loading administrative personnel..." />;
+  }
+
+  const staffList = Array.isArray(staff) ? staff : [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -51,28 +32,52 @@ export default function AdminsListScreen() {
       </View>
 
       <FlatList
-        data={admins}
+        data={staffList}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
-        renderItem={({ item }) => (
-          <Card variant="default" style={styles.card}>
-            <TouchableOpacity
-              onPress={() => router.push(`/admins/${item.id}`)}
-              style={styles.row}
-            >
-              <Avatar name={item.name} size="md" />
-              <View style={{ flex: 1, marginLeft: 14 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.name}>{item.name}</Text>
-                  <Badge label={item.role} variant="info" />
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', padding: 40 }}>
+            <Text style={{ fontSize: 32, marginBottom: 12 }}>🛡️</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
+              {isError ? 'Unable to load operators' : 'No Subordinate Administrators'}
+            </Text>
+            <Text style={{ fontSize: 13, color: '#64748B', marginTop: 4, textAlign: 'center' }}>
+              {isError
+                ? 'Could not connect to the administration service.'
+                : 'No operator or manager accounts created under this jurisdiction yet.'}
+            </Text>
+          </View>
+        }
+        renderItem={({ item }) => {
+          const name = item.name || item.email || 'Administrator';
+          const lastLogin = item.lastLoginAt
+            ? new Date(item.lastLoginAt).toLocaleDateString('en-IN', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : 'Never logged in';
+          return (
+            <Card variant="default" style={styles.card}>
+              <TouchableOpacity
+                onPress={() => router.push(`/admins/${item.id}`)}
+                style={styles.row}
+              >
+                <Avatar name={name} size="md" />
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.name}>{name}</Text>
+                    <Badge label={item.role} variant="info" />
+                  </View>
+                  <Text style={styles.email}>{item.email}</Text>
+                  <Text style={styles.lastLogin}>Last login: {lastLogin}</Text>
                 </View>
-                <Text style={styles.email}>{item.email}</Text>
-                <Text style={styles.lastLogin}>Last authenticated: {item.lastLogin}</Text>
-              </View>
-              <Text style={{ fontSize: 20, color: '#94A3B8' }}>›</Text>
-            </TouchableOpacity>
-          </Card>
-        )}
+                <Text style={{ fontSize: 20, color: '#94A3B8' }}>›</Text>
+              </TouchableOpacity>
+            </Card>
+          );
+        }}
       />
     </SafeAreaView>
   );

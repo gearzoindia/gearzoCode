@@ -56,7 +56,7 @@ export class FinanceController {
     return this.financeService.createRefund(dto, admin);
   }
 
-  @Get('payout-runs')
+  @Get(['payout-runs', 'payouts', 'finance/payouts'])
   @Permissions('PAYOUT_PREPARE')
   @ApiOperation({ summary: 'List payout batches/runs scoped to jurisdiction' })
   async findAllPayoutRuns(@Query() dto: QueryPayoutRunsDto, @Req() req: Request) {

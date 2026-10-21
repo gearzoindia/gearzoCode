@@ -34,18 +34,18 @@ export class JwtService {
   }
 
   signAccessToken(payload: SignJwtInput): string {
-    const { expiresInSec = 900, ...claims } = payload;
+    const { expiresInSec = 900, aud, ...claims } = payload;
     return jwt.sign(claims, this.secret, {
       expiresIn: expiresInSec,
-      audience: claims.aud,
+      audience: aud,
     });
   }
 
   async verifyAccessToken(token: string, expectedAudience: string): Promise<JwtPayload> {
     try {
-      const decoded = jwt.verify(token, this.secret, {
-        audience: expectedAudience,
-      }) as JwtPayload;
+      const decoded = (jwt.verify(token, this.secret, {
+        audience: new RegExp('^' + expectedAudience + '$', 'i'),
+      }) as unknown) as JwtPayload;
 
       if (!decoded.sub || !decoded.aud) {
         throw new UnauthorizedException('Malformed token payload');

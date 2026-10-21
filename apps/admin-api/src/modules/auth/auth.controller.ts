@@ -59,7 +59,7 @@ export class AuthController {
   }
 
   @Public()
-  @Post('2fa/verify')
+  @Post(['2fa/verify', 'totp/verify'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Admin login step 3 (TOTP authenticator verification -> tokens)' })
   async verify2fa(

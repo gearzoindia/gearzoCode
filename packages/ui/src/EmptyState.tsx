@@ -5,9 +5,11 @@ import { Button } from './Button';
 export interface EmptyStateProps {
   icon?: React.ReactNode;
   title: string;
-  message: string;
+  message?: string;
+  description?: string;
   actionTitle?: string;
-  onAction?: () => void;
+  buttonTitle?: string;
+  onAction?: (arg?: any) => void;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -15,10 +17,14 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   icon,
   title,
   message,
+  description,
   actionTitle,
+  buttonTitle,
   onAction,
   style,
 }) => {
+  const desc = message || description;
+  const btn = actionTitle || buttonTitle;
   return (
     <View
       style={[
@@ -50,13 +56,13 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           color: '#6B7280',
           textAlign: 'center',
           lineHeight: 20,
-          marginBottom: actionTitle && onAction ? 24 : 0,
+          marginBottom: btn && onAction ? 24 : 0,
         }}
       >
-        {message}
+        {desc}
       </Text>
-      {actionTitle && onAction && (
-        <Button title={actionTitle} onPress={onAction} variant="primary" size="md" />
+      {btn && onAction && (
+        <Button title={btn} onPress={onAction} variant="primary" size="md" />
       )}
     </View>
   );

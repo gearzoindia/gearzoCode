@@ -1,8 +1,8 @@
-2
-import { Injectable, Inject, BadRequestException, HttpException, HttpStatus, Logger, Optional } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, HttpException, HttpStatus, Optional } from '@nestjs/common';
 import { randomInt } from 'node:crypto';
 import * as argon2 from 'argon2';
-import { OTP_PROVIDER, OtpProvider } from './otp.provider';
+import { OTP_PROVIDER } from './otp.provider';
+import type { OtpProvider } from './otp.provider';
 import { LimitsService } from '../limits.service';
 import { prisma, PrismaClient } from '@gearzo/db';
 
@@ -14,8 +14,6 @@ export interface SendOtpResult {
 
 @Injectable()
 export class OtpService {
-  private readonly logger = new Logger(OtpService.name);
-
   constructor(
     @Inject(OTP_PROVIDER)
     private readonly otpProvider: OtpProvider,

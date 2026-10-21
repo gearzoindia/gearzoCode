@@ -13,12 +13,20 @@ import { Request } from 'express';
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
-  @Get('dashboard')
+  @Get(['dashboard', 'dashboard/metrics', 'admin/dashboard/metrics'])
   @Permissions('DASHBOARD_VIEW')
   @ApiOperation({ summary: 'Get scoped dashboard overview statistics' })
   async getDashboard(@Query() dto: DashboardFilterDto, @Req() req: Request) {
     const scope = (req as any).jurisdictionScope;
     return this.dashboardService.getStats(dto, scope);
+  }
+
+  @Get(['live-map', 'admin/live-map'])
+  @Permissions('DASHBOARD_VIEW')
+  @ApiOperation({ summary: 'Get combined live map entities' })
+  async getLiveMap(@Query() dto: LiveMapDto, @Req() req: Request) {
+    const scope = (req as any).jurisdictionScope;
+    return this.dashboardService.getLiveMap(dto, scope);
   }
 
   @Get('live/mechanics')

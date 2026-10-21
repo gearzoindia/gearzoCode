@@ -7,40 +7,9 @@ import { Card, Badge, EmptyState, LoadingScreen } from '@gearzo/ui';
 
 export default function AdminKycQueueScreen() {
   const router = useRouter();
-  const { data: queue, isLoading, refetch, isRefetching } = useAdminKycQueue();
+  const { data: queue, isLoading, isError, refetch, isRefetching } = useAdminKycQueue();
 
-  const mockQueue = queue || [
-    {
-      id: 'm-201',
-      name: 'Santosh Kumar',
-      phone: '+91 99001 22334',
-      type: 'INDIVIDUAL',
-      kycStatus: 'SUBMITTED',
-      rating: 0,
-      isOnline: false,
-      totalJobs: 0,
-    },
-    {
-      id: 'm-202',
-      name: 'Balaji Auto Works (Deepak B.)',
-      phone: '+91 98450 11223',
-      type: 'SHOP',
-      kycStatus: 'SUBMITTED',
-      rating: 0,
-      isOnline: false,
-      totalJobs: 0,
-    },
-    {
-      id: 'm-203',
-      name: 'Mohammed Imran',
-      phone: '+91 97410 88990',
-      type: 'INDIVIDUAL',
-      kycStatus: 'SUBMITTED',
-      rating: 0,
-      isOnline: false,
-      totalJobs: 0,
-    },
-  ];
+  const displayQueue = Array.isArray(queue) ? queue : [];
 
   if (isLoading && !isRefetching) {
     return <LoadingScreen message="Loading KYC review queue..." />;
@@ -53,11 +22,11 @@ export default function AdminKycQueueScreen() {
           <Text style={styles.title}>KYC Verification Queue</Text>
           <Text style={styles.sub}>Review government identification proofs (Oldest first)</Text>
         </View>
-        <Badge label={`${mockQueue.length} PENDING`} variant="warning" />
+        <Badge label={`${displayQueue.length} PENDING`} variant="warning" />
       </View>
 
       <FlatList
-        data={mockQueue}
+        data={displayQueue}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
         renderItem={({ item, index }) => (

@@ -27,7 +27,7 @@ export class CatalogueController {
   constructor(private readonly catalogueService: CatalogueService) {}
 
   // Categories
-  @Get('service-categories')
+  @Get(['service-categories', 'catalogue/categories', 'admin/catalogue/categories'])
   @Permissions('CATALOGUE_MANAGE')
   @ApiOperation({ summary: 'List all service categories with sort order' })
   async findAllCategories() {
@@ -73,7 +73,7 @@ export class CatalogueController {
   }
 
   // Services
-  @Get('services')
+  @Get(['services', 'catalogue/services', 'admin/catalogue/services'])
   @Permissions('CATALOGUE_MANAGE')
   @ApiOperation({ summary: 'List all catalog services' })
   async findAllServices() {

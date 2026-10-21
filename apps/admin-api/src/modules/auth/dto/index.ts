@@ -2,10 +2,15 @@ import { IsString, IsNotEmpty, IsOptional, MinLength, Length, IsEmail } from 'cl
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class LoginDto {
-  @ApiProperty({ description: 'Email or E.164 phone number', example: 'admin@gearzo.in' })
+  @ApiPropertyOptional({ description: 'Email or E.164 phone number', example: 'admin@gearzo.in' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  identifier!: string;
+  identifier?: string;
+
+  @ApiPropertyOptional({ description: 'Email alias for identifier', example: 'admin@gearzo.in' })
+  @IsOptional()
+  @IsString()
+  email?: string;
 
   @ApiProperty({ description: 'Password', example: 'SecretP@ssw0rd!' })
   @IsString()
@@ -42,6 +47,11 @@ export class RefreshTokenDto {
   @IsString()
   @IsNotEmpty()
   refreshToken!: string;
+
+  @ApiProperty({ description: 'Target audience', required: false })
+  @IsString()
+  @IsOptional()
+  audience?: string;
 }
 
 export class AcceptInviteDto {

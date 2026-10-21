@@ -7,18 +7,13 @@ import { Badge, Card } from '@gearzo/ui';
 
 export default function AdminLiveMapScreen() {
   const router = useRouter();
-  const { data: entities, isLoading, refetch } = useAdminLiveMap();
+  const { data: entities, isLoading, isError, refetch } = useAdminLiveMap();
 
   const [filterType, setFilterType] = useState<'ALL' | 'MECHANIC' | 'CUSTOMER'>('ALL');
 
-  const mockEntities = entities || [
-    { id: 'm1', name: 'Ramesh K. (Online)', type: 'mechanic' as const, latitude: 12.9716, longitude: 77.5946, status: 'DUTY_ONLINE' },
-    { id: 'm2', name: 'Suresh M. (En Route)', type: 'mechanic' as const, latitude: 12.9352, longitude: 77.6245, status: 'EN_ROUTE' },
-    { id: 'c1', name: 'Anand V. (Job #GZ-88120)', type: 'customer' as const, latitude: 12.9698, longitude: 77.7499, status: 'WAITING_DISPATCH' },
-    { id: 'c2', name: 'Priya R. (Job #GZ-88121)', type: 'customer' as const, latitude: 12.9279, longitude: 77.6835, status: 'IN_SERVICE' },
-  ];
+  const displayEntities = Array.isArray(entities) ? entities : [];
 
-  const filtered = mockEntities.filter((e) => {
+  const filtered = displayEntities.filter((e: any) => {
     if (filterType === 'ALL') return true;
     if (filterType === 'MECHANIC') return e.type === 'mechanic';
     if (filterType === 'CUSTOMER') return e.type === 'customer';
@@ -40,7 +35,7 @@ export default function AdminLiveMapScreen() {
             onPress={() => setFilterType('ALL')}
           >
             <Text style={[styles.filterText, filterType === 'ALL' && styles.filterTextActive]}>
-              All ({mockEntities.length})
+              All ({displayEntities.length})
             </Text>
           </TouchableOpacity>
 

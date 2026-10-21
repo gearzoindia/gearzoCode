@@ -9,44 +9,13 @@ export default function AdminMechanicsListScreen() {
   const router = useRouter();
   const [search, setSearch] = useState('');
 
-  const { data: mechanics, isLoading, refetch } = useAdminMechanics(search || undefined);
-
-  const mockMechanics = mechanics || [
-    {
-      id: 'm-101',
-      name: 'Ramesh Kumar',
-      phone: '+91 98765 43210',
-      type: 'INDIVIDUAL',
-      kycStatus: 'VERIFIED',
-      rating: 4.89,
-      isOnline: true,
-      totalJobs: 342,
-    },
-    {
-      id: 'm-102',
-      name: 'Shiva Auto Garage (Santosh S.)',
-      phone: '+91 98112 23344',
-      type: 'SHOP',
-      kycStatus: 'VERIFIED',
-      rating: 4.75,
-      isOnline: true,
-      totalJobs: 620,
-    },
-    {
-      id: 'm-103',
-      name: 'Vijay Verma',
-      phone: '+91 99001 12233',
-      type: 'INDIVIDUAL',
-      kycStatus: 'SUBMITTED',
-      rating: 0,
-      isOnline: false,
-      totalJobs: 0,
-    },
-  ];
+  const { data: mechanics, isLoading, isError, refetch } = useAdminMechanics(search || undefined);
 
   if (isLoading) {
     return <LoadingScreen message="Loading mechanics directory..." />;
   }
+
+  const displayMechanics = Array.isArray(mechanics) ? mechanics : [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -65,9 +34,18 @@ export default function AdminMechanicsListScreen() {
       </View>
 
       <FlatList
-        data={mockMechanics}
+        data={displayMechanics}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', padding: 40 }}>
+            <Text style={{ fontSize: 32, marginBottom: 12 }}>🔧</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>No Mechanics Found</Text>
+            <Text style={{ fontSize: 13, color: '#64748B', marginTop: 4, textAlign: 'center' }}>
+              {search ? 'No mechanics matching your search query.' : 'No mechanic partners onboarded yet.'}
+            </Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <Card variant="default" style={styles.card}>
             <TouchableOpacity

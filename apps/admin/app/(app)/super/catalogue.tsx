@@ -7,42 +7,9 @@ import { useAdminCatalogueServices } from '@gearzo/api-client';
 
 export default function CatalogueMasterScreen() {
   const router = useRouter();
-  const { data: services, isLoading } = useAdminCatalogueServices();
+  const { data: services, isLoading, isError } = useAdminCatalogueServices();
 
-  const mockServices = [
-    {
-      id: 'srv-1',
-      name: 'Standard Periodic Service (2-Wheeler)',
-      durationMinutes: 60,
-      basePricePaise: 99900,
-      vehicleTypes: ['TWO_WHEELER'],
-      status: 'ACTIVE',
-    },
-    {
-      id: 'srv-2',
-      name: 'Comprehensive 40-Point Periodic Service',
-      durationMinutes: 90,
-      basePricePaise: 149900,
-      vehicleTypes: ['TWO_WHEELER', 'FOUR_WHEELER'],
-      status: 'ACTIVE',
-    },
-    {
-      id: 'srv-3',
-      name: 'Doorstep Battery Jumpstart & Diagnostic',
-      durationMinutes: 30,
-      basePricePaise: 49900,
-      vehicleTypes: ['TWO_WHEELER', 'FOUR_WHEELER', 'COMMERCIAL'],
-      status: 'ACTIVE',
-    },
-    {
-      id: 'srv-4',
-      name: 'Front & Rear Brake Caliper Overhaul',
-      durationMinutes: 45,
-      basePricePaise: 64900,
-      vehicleTypes: ['TWO_WHEELER'],
-      status: 'ACTIVE',
-    },
-  ];
+  const displayServices = Array.isArray(services) ? services : [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -61,9 +28,18 @@ export default function CatalogueMasterScreen() {
       </View>
 
       <FlatList
-        data={mockServices}
+        data={displayServices}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', padding: 40 }}>
+            <Text style={{ fontSize: 32, marginBottom: 12 }}>📋</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>No Services Configured</Text>
+            <Text style={{ fontSize: 13, color: '#64748B', marginTop: 4, textAlign: 'center' }}>
+              Service catalogue is empty. Click '+ Add Service Definition' to add one.
+            </Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <Card variant="default" style={styles.card}>
             <View style={styles.row}>

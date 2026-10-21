@@ -25,39 +25,39 @@ export default function AdminDashboardScreen() {
   const statCards = [
     {
       title: "Today's Revenue",
-      value: `₹${((metrics?.revenueTodayPaise || 8495000) / 100).toLocaleString('en-IN')}`,
-      sub: '+18.4% vs last week',
+      value: `₹${(((metrics?.revenueTodayPaise ?? 0)) / 100).toLocaleString('en-IN')}`,
+      sub: 'Telemetry aggregate',
       icon: '💰',
       color: '#10B981',
       route: '/finance/payouts',
     },
     {
       title: 'Active Bookings',
-      value: (metrics?.totalBookingsToday || 42).toString(),
-      sub: '14 en-route • 8 in-progress',
+      value: (metrics?.totalBookingsToday ?? 0).toString(),
+      sub: 'In-flight orders',
       icon: '⚡',
       color: '#3B82F6',
       route: '/bookings',
     },
     {
       title: 'Online Mechanics',
-      value: (metrics?.activeMechanicsCount || 68).toString(),
-      sub: '92% in 5km radius',
+      value: (metrics?.activeMechanicsCount ?? 0).toString(),
+      sub: 'On duty',
       icon: '👨‍🔧',
       color: '#6366F1',
       route: '/live-map',
     },
     {
       title: 'Pending KYC Queue',
-      value: (metrics?.pendingKycCount || 9).toString(),
-      sub: 'Oldest: 4 hrs ago',
+      value: (metrics?.pendingKycCount ?? 0).toString(),
+      sub: 'Requires review',
       icon: '🪪',
       color: '#F59E0B',
       route: '/mechanics/kyc-queue',
     },
     {
       title: 'Open Disputes',
-      value: (metrics?.openDisputesCount || 2).toString(),
+      value: (metrics?.openDisputesCount ?? 0).toString(),
       sub: 'Requires ops intervention',
       icon: '⚠️',
       color: '#EF4444',
@@ -124,37 +124,28 @@ export default function AdminDashboardScreen() {
         </View>
 
         <View style={{ gap: 12 }}>
-          {(bookings?.slice(0, 4) || [
-            {
-              id: 'gz-88120',
-              serviceName: 'Comprehensive 40-Point Periodic Service',
-              vehicleSummary: 'Royal Enfield Classic 350 (KA05MB9912)',
-              scheduledAt: new Date().toISOString(),
-              status: 'IN_PROGRESS',
-              totalAmountPaise: 149900,
-            },
-            {
-              id: 'gz-88121',
-              serviceName: 'Emergency Battery Jumpstart',
-              vehicleSummary: 'Hyundai Creta (KA01MC8823)',
-              scheduledAt: new Date().toISOString(),
-              status: 'ON_THE_WAY',
-              totalAmountPaise: 49900,
-            },
-          ]).map((b) => (
-            <BookingCard
-              key={b.id}
-              id={b.id}
-              serviceName={b.serviceName}
-              vehicleSummary={b.vehicleSummary}
-              scheduledAt={b.scheduledAt}
-              status={b.status}
-              totalAmountPaise={b.totalAmountPaise}
-              actionTitle="Inspect Order"
-              onAction={() => router.push(`/bookings/${b.id}`)}
-              onPress={() => router.push(`/bookings/${b.id}`)}
-            />
-          ))}
+          {Array.isArray(bookings) && bookings.length > 0 ? (
+            bookings.slice(0, 4).map((b) => (
+              <BookingCard
+                key={b.id}
+                id={b.id}
+                serviceName={b.serviceName}
+                vehicleSummary={b.vehicleSummary}
+                scheduledAt={b.scheduledAt}
+                status={b.status}
+                totalAmountPaise={b.totalAmountPaise}
+                actionTitle="Inspect Order"
+                onAction={() => router.push(`/bookings/${b.id}`)}
+                onPress={() => router.push(`/bookings/${b.id}`)}
+              />
+            ))
+          ) : (
+            <Card variant="default" style={{ padding: 24, alignItems: 'center' }}>
+              <Text style={{ fontSize: 14, color: '#64748B', fontWeight: '500' }}>
+                No active service bookings at this time
+              </Text>
+            </Card>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -18,75 +18,18 @@ export default function AdminBookingsIndex() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
-  const { data: bookings, isLoading, refetch, isRefetching } = useAdminBookings({
+  const { data: bookings, isLoading, isError, refetch, isRefetching } = useAdminBookings({
     status: statusFilter === 'ALL' ? undefined : statusFilter,
   });
 
-  const mockBookings = bookings || [
-    {
-      id: 'GZ-88120',
-      customerId: 'c1',
-      serviceId: 's1',
-      serviceName: 'Comprehensive 40-Point Periodic Service',
-      servicePricePaise: 149900,
-      vehicleId: 'v1',
-      vehicleSummary: 'Royal Enfield Classic 350 (KA05MB9912)',
-      status: 'IN_PROGRESS' as const,
-      scheduledAt: new Date().toISOString(),
-      address: 'Villa 14, Palm Meadows, Whitefield, Bengaluru',
-      latitude: 12.9698,
-      longitude: 77.7499,
-      totalAmountPaise: 149900,
-      paidAmountPaise: 149900,
-      balanceAmountPaise: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'GZ-88121',
-      customerId: 'c2',
-      serviceId: 's2',
-      serviceName: 'Emergency Battery Jumpstart',
-      servicePricePaise: 49900,
-      vehicleId: 'v2',
-      vehicleSummary: 'Hyundai Creta (KA01MC8823)',
-      status: 'ON_THE_WAY' as const,
-      scheduledAt: new Date().toISOString(),
-      address: 'Prestige Tech Park, Marathahalli, Bengaluru',
-      latitude: 12.9352,
-      longitude: 77.6835,
-      totalAmountPaise: 49900,
-      paidAmountPaise: 49900,
-      balanceAmountPaise: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'GZ-88118',
-      customerId: 'c3',
-      serviceId: 's3',
-      serviceName: 'Front & Rear Brake Pad Replacement',
-      servicePricePaise: 79900,
-      vehicleId: 'v3',
-      vehicleSummary: 'Honda Activa 6G (KA03HA2201)',
-      status: 'COMPLETED' as const,
-      scheduledAt: new Date(Date.now() - 86400000).toISOString(),
-      address: 'Indiranagar 100ft Rd, Bengaluru',
-      latitude: 12.9716,
-      longitude: 77.5946,
-      totalAmountPaise: 92500,
-      paidAmountPaise: 92500,
-      balanceAmountPaise: 0,
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 86400000).toISOString(),
-    },
-  ];
+  const listData = Array.isArray(bookings) ? bookings : [];
 
-  const filtered = mockBookings.filter((b) => {
+  const filtered = listData.filter((b) => {
     const matchesQuery =
-      b.id.toLowerCase().includes(search.toLowerCase()) ||
-      b.vehicleSummary.toLowerCase().includes(search.toLowerCase()) ||
-      b.serviceName.toLowerCase().includes(search.toLowerCase());
+      (b.id || '').toLowerCase().includes(search.toLowerCase()) ||
+      (b.code || '').toLowerCase().includes(search.toLowerCase()) ||
+      (b.vehicleSummary || '').toLowerCase().includes(search.toLowerCase()) ||
+      (b.serviceName || '').toLowerCase().includes(search.toLowerCase());
     return matchesQuery;
   });
 

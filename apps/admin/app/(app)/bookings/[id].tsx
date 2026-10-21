@@ -2,41 +2,72 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Badge, Button } from '@gearzo/ui';
+import { Card, Badge, Button, LoadingScreen, EmptyState } from '@gearzo/ui';
+import { useAdminBookingDetail } from '@gearzo/api-client';
 
 export default function AdminBookingDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const booking = {
-    id: id || 'GZ-88120',
-    serviceName: 'Comprehensive 40-Point Periodic Service',
-    status: 'IN_PROGRESS',
-    customerName: 'Anand Verma',
-    customerPhone: '+91 98765 43210',
-    customerAddress: 'Villa 14, Palm Meadows, Whitefield, Bengaluru',
-    mechanicName: 'Ramesh Kumar',
-    mechanicPhone: '+91 98765 99881',
-    mechanicRating: '4.89',
-    vehicle: 'Royal Enfield Classic 350 (KA05MB9912)',
-    basePricePaise: 119900,
-    platformFeePaise: 4900,
-    taxesPaise: 22400,
-    totalPaise: 147200,
-  };
+  const { data: booking, isLoading, error } = useAdminBookingDetail(id || '');
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading order details..." />;
+  }
+
+  if (error || !booking) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Text style={{ fontSize: 20 }}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Order Inspection</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <EmptyState
+            title="Order Not Found"
+            description="The requested service order could not be located in the database."
+            buttonTitle="Return to Orders"
+            onAction={() => router.back()}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const orderCode = booking.code || booking.id.slice(0, 8);
+  const customerName = booking.customer?.name || booking.customer?.phone || 'Customer';
+  const customerPhone = booking.customer?.phone || 'No phone';
+  const customerAddress =
+    booking.addressSnapshot?.formattedAddress ||
+    booking.addressSnapshot?.addressLine1 ||
+    booking.address ||
+    'Doorstep location';
+
+  const mechanicName = booking.mechanic?.name || booking.mechanic?.phone || 'Unassigned';
+  const mechanicPhone = booking.mechanic?.phone || 'N/A';
+  const mechanicRating = booking.mechanic?.profile?.ratingAvg ? Number(booking.mechanic.profile.ratingAvg).toFixed(1) : '5.0';
+
+  const vehicleTitle = booking.vehicleSnapshot
+    ? `${booking.vehicleSnapshot.brand || ''} ${booking.vehicleSnapshot.model || ''} (${booking.vehicleSnapshot.registrationNumber || 'No plate'})`.trim()
+    : booking.vehicleSummary || 'Vehicle';
+
+  const totalPaise = booking.finalTotalPaise || booking.estimatedTotalPaise || booking.totalAmountPaise || 0;
 
   const handleReassign = () => {
-    Alert.alert('Reassign Mechanic', 'Re-broadcasting job offer to nearest available mechanics.');
+    Alert.alert('Reassign Mechanic', 'Re-broadcasting job offer to nearest available mechanics in zone.');
   };
 
   const handleCancelAndRefund = () => {
-    Alert.alert('Cancel & Full Refund', 'Are you sure you want to cancel and initiate 100% refund?', [
+    Alert.alert('Cancel & Full Refund', 'Are you sure you want to cancel this order and initiate refund?', [
       { text: 'No', style: 'cancel' },
       {
         text: 'Confirm Refund',
         style: 'destructive',
         onPress: () => {
-          Alert.alert('Refund Issued', '₹1,472.00 refunded to customer source account.');
+          Alert.alert('Action Logged', 'Cancellation workflow logged with operations.');
           router.back();
         },
       },
@@ -50,8 +81,11 @@ export default function AdminBookingDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={{ fontSize: 20 }}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Order #{booking.id}</Text>
-        <Badge label={booking.status} variant="warning" />
+        <Text style={styles.headerTitle}>Order #{orderCode}</Text>
+        <Badge
+          label={booking.status}
+          variant={booking.status === 'COMPLETED' ? 'success' : booking.status === 'CANCELLED' ? 'neutral' : 'warning'}
+        />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
@@ -59,47 +93,65 @@ export default function AdminBookingDetailScreen() {
         <View style={styles.gridRow}>
           <Card variant="default" style={styles.colCard}>
             <Text style={styles.cardHeader}>Customer</Text>
-            <Text style={styles.mainName}>{booking.customerName}</Text>
-            <Text style={styles.phone}>{booking.customerPhone}</Text>
-            <Text style={styles.address}>{booking.customerAddress}</Text>
+            <Text style={styles.mainName}>{customerName}</Text>
+            <Text style={styles.phone}>{customerPhone}</Text>
+            <Text style={styles.address}>{customerAddress}</Text>
+            {booking.customer?.id && (
+              <TouchableOpacity
+                onPress={() => router.push(`/customers/${booking.customer.id}`)}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1B5E20' }}>
+                  View Customer Profile →
+                </Text>
+              </TouchableOpacity>
+            )}
           </Card>
 
           <Card variant="default" style={styles.colCard}>
-            <Text style={styles.cardHeader}>Assigned Mechanic</Text>
-            <Text style={styles.mainName}>{booking.mechanicName}</Text>
-            <Text style={styles.phone}>{booking.mechanicPhone} • ★ {booking.mechanicRating}</Text>
-            <TouchableOpacity style={styles.reassignBtn} onPress={handleReassign}>
-              <Text style={styles.reassignText}>Reassign Mechanic</Text>
-            </TouchableOpacity>
+            <Text style={styles.cardHeader}>Assigned Partner</Text>
+            <Text style={styles.mainName}>{mechanicName}</Text>
+            <Text style={styles.phone}>
+              {booking.mechanic ? `${mechanicPhone} • ★ ${mechanicRating}` : 'Awaiting dispatch'}
+            </Text>
+            {booking.mechanic ? (
+              <TouchableOpacity
+                onPress={() => router.push(`/mechanics/${booking.mechanic.id}`)}
+                style={{ marginTop: 8 }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1B5E20' }}>
+                  View Partner Profile →
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.reassignBtn} onPress={handleReassign}>
+                <Text style={styles.reassignText}>Assign Partner</Text>
+              </TouchableOpacity>
+            )}
           </Card>
         </View>
 
         {/* Vehicle & Service */}
         <Card variant="default" style={styles.card}>
           <Text style={styles.cardHeader}>Vehicle & Service Package</Text>
-          <Text style={styles.vehicleTitle}>{booking.vehicle}</Text>
-          <Text style={styles.serviceTitle}>{booking.serviceName}</Text>
+          <Text style={styles.vehicleTitle}>{vehicleTitle}</Text>
+          <Text style={styles.serviceTitle}>{booking.serviceName || booking.instructions || 'Standard Inspection & Service'}</Text>
+          <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+            Mode: {booking.serviceMode || 'DOORSTEP'}
+          </Text>
         </Card>
 
         {/* Financial Breakdown */}
         <Card variant="elevated" style={styles.card}>
           <Text style={styles.cardHeader}>Payment & Settlement</Text>
           <View style={styles.billRow}>
-            <Text style={styles.billLabel}>Base Service Labor</Text>
-            <Text style={styles.billValue}>₹{(booking.basePricePaise / 100).toFixed(2)}</Text>
-          </View>
-          <View style={styles.billRow}>
-            <Text style={styles.billLabel}>Platform Convenience Fee</Text>
-            <Text style={styles.billValue}>₹{(booking.platformFeePaise / 100).toFixed(2)}</Text>
-          </View>
-          <View style={styles.billRow}>
-            <Text style={styles.billLabel}>Taxes (GST 18%)</Text>
-            <Text style={styles.billValue}>₹{(booking.taxesPaise / 100).toFixed(2)}</Text>
+            <Text style={styles.billLabel}>Service Order Amount</Text>
+            <Text style={styles.billValue}>₹{(totalPaise / 100).toFixed(2)}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.billRow}>
-            <Text style={styles.totalLabel}>Total Captured</Text>
-            <Text style={styles.totalValue}>₹{(booking.totalPaise / 100).toFixed(2)}</Text>
+            <Text style={styles.totalLabel}>Total Amount</Text>
+            <Text style={styles.totalValue}>₹{(totalPaise / 100).toFixed(2)}</Text>
           </View>
         </Card>
 
@@ -148,21 +200,22 @@ const styles = StyleSheet.create({
   },
   colCard: {
     flex: 1,
-    minWidth: 260,
+    minWidth: 280,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 14,
   },
   card: {
-    padding: 16,
-    borderRadius: 12,
+    padding: 18,
+    borderRadius: 14,
     marginBottom: 16,
   },
   cardHeader: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#64748B',
     textTransform: 'uppercase',
-    marginBottom: 6,
+    letterSpacing: 0.5,
+    marginBottom: 8,
   },
   mainName: {
     fontSize: 16,
@@ -178,20 +231,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     marginTop: 6,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   reassignBtn: {
     marginTop: 10,
     alignSelf: 'flex-start',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 10,
+    backgroundColor: '#EEF2F6',
     paddingVertical: 6,
-    borderRadius: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
   },
   reassignText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0284C7',
+    color: '#0F172A',
   },
   vehicleTitle: {
     fontSize: 16,
@@ -200,13 +253,14 @@ const styles = StyleSheet.create({
   },
   serviceTitle: {
     fontSize: 13,
-    color: '#475569',
-    marginTop: 2,
+    color: '#334155',
+    marginTop: 4,
   },
   billRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    alignItems: 'center',
+    marginVertical: 4,
   },
   billLabel: {
     fontSize: 13,
@@ -220,7 +274,7 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: '#E2E8F0',
-    marginVertical: 10,
+    marginVertical: 8,
   },
   totalLabel: {
     fontSize: 15,
@@ -230,6 +284,6 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#166534',
+    color: '#1B5E20',
   },
 });

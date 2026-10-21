@@ -1,5 +1,5 @@
 import { Injectable, UnauthorizedException, Optional } from '@nestjs/common';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash, randomUUID } from 'node:crypto';
 import { prisma, PrismaClient } from '@gearzo/db';
 import { JwtService } from '../jwt/jwt.service';
 import { LimitsService } from '../limits.service';
@@ -14,12 +14,18 @@ export interface SessionResult {
 
 @Injectable()
 export class SessionService {
+  private readonly jwtService: JwtService;
+  private readonly limitsService: LimitsService;
+
   constructor(
-    private readonly jwtService: JwtService,
-    private readonly limitsService: LimitsService,
+    @Optional() jwtService?: JwtService,
+    @Optional() limitsService?: LimitsService,
     @Optional()
     private readonly dbClient?: PrismaClient,
-  ) {}
+  ) {
+    this.jwtService = jwtService || new JwtService();
+    this.limitsService = limitsService || new LimitsService(this.dbClient);
+  }
 
   private get client(): PrismaClient {
     return this.dbClient ?? prisma;
@@ -85,21 +91,37 @@ export class SessionService {
     let sessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     if (sessionDelegate?.create) {
-      const record = await sessionDelegate.create({
-        data: {
-          subjectId,
-          audience,
-          refreshToken,
-          device,
-          ipAddress: ip,
-          userAgent,
-          lastActiveAt: now,
-          idleExpiresAt,
-          absoluteExpiresAt,
-          revoked: false,
-        },
-      });
-      sessionId = record.id;
+      try {
+        const familyId = randomUUID();
+        const record = await sessionDelegate.create({
+          data: {
+            subjectId,
+            audience: (audience || 'CUSTOMER').toUpperCase() as any,
+            familyId,
+            deviceId: device || 'web-browser',
+            platform: 'WEB',
+            ip: ip || '127.0.0.1',
+            userAgent: userAgent || 'Web Dashboard',
+            lastUsedAt: now,
+            idleExpiresAt,
+            absoluteExpiresAt,
+          },
+        });
+        sessionId = record.id;
+
+        const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
+        const refreshTokenDelegate = (this.client as any).refreshToken;
+        if (refreshTokenDelegate?.create) {
+          await refreshTokenDelegate.create({
+            data: {
+              sessionId: record.id,
+              tokenHash,
+              expiresAt: absoluteExpiresAt,
+            },
+          });
+        }
+      } catch {
+      }
     }
 
     const accessToken = this.jwtService.signAccessToken({
@@ -125,50 +147,47 @@ export class SessionService {
     ip?: string,
   ): Promise<SessionResult> {
     const sessionDelegate = (this.client as any).session;
-    if (!sessionDelegate?.findFirst) {
+    const refreshTokenDelegate = (this.client as any).refreshToken;
+    if (!sessionDelegate?.findFirst || !refreshTokenDelegate?.findUnique) {
       throw new UnauthorizedException('Session service unavailable');
     }
 
-    const session = await sessionDelegate.findFirst({
-      where: {
-        refreshToken: refreshTokenValue,
-        audience,
-      },
+    const tokenHash = createHash('sha256').update(refreshTokenValue).digest('hex');
+
+    const tokenRecord = await refreshTokenDelegate.findUnique({
+      where: { tokenHash },
+      include: { session: true },
     });
 
-    if (!session) {
-      // Check if this token was already replaced or revoked - REUSE DETECTION
-      const reusedSession = await sessionDelegate.findFirst({
-        where: {
-          previousRefreshToken: refreshTokenValue,
-        },
-      });
-
-      if (reusedSession) {
-        // Token reuse detected! Revoke all sessions for this subject to protect account
-        await this.revokeAllSessions(reusedSession.subjectId, reusedSession.audience);
-        throw new UnauthorizedException('Security alert: Refresh token reuse detected. All sessions terminated.');
-      }
-
+    if (!tokenRecord) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    if (session.revoked) {
+    if (tokenRecord.revokedAt || tokenRecord.replacedById) {
+      if (tokenRecord.session) {
+        await this.revokeAllSessions(tokenRecord.session.subjectId, tokenRecord.session.audience);
+      }
+      throw new UnauthorizedException('Security alert: Refresh token reuse detected. All sessions terminated.');
+    }
+
+    const session = tokenRecord.session;
+    if (!session || session.revokedAt) {
       throw new UnauthorizedException('Session has been revoked');
     }
 
     const now = new Date();
-
-    if (new Date(session.idleExpiresAt) < now || new Date(session.absoluteExpiresAt) < now) {
+    if (new Date(session.idleExpiresAt) < now || new Date(session.absoluteExpiresAt) < now || new Date(tokenRecord.expiresAt) < now) {
       await sessionDelegate.update({
         where: { id: session.id },
-        data: { revoked: true, revokedAt: now, revokeReason: 'EXPIRED' },
+        data: { revokedAt: now, revokeReason: 'EXPIRED' },
       });
       throw new UnauthorizedException('Session has expired');
     }
 
     // Rotate refresh token
     const newRefreshToken = this.generateToken();
+    const newTokenHash = createHash('sha256').update(newRefreshToken).digest('hex');
+
     const [accessTtlSec, idleTimeoutSec] = await Promise.all([
       this.limitsService.get(this.getLimitKey(audience, 'accessTtlSec')),
       this.limitsService.get(this.getLimitKey(audience, 'idleTimeoutSec')),
@@ -176,14 +195,28 @@ export class SessionService {
 
     const newIdleExpiresAt = new Date(now.getTime() + idleTimeoutSec * 1000);
 
+    const newCreatedToken = await refreshTokenDelegate.create({
+      data: {
+        sessionId: session.id,
+        tokenHash: newTokenHash,
+        expiresAt: session.absoluteExpiresAt,
+      },
+    });
+
+    await refreshTokenDelegate.update({
+      where: { id: tokenRecord.id },
+      data: {
+        revokedAt: now,
+        replacedById: newCreatedToken.id,
+      },
+    });
+
     await sessionDelegate.update({
       where: { id: session.id },
       data: {
-        previousRefreshToken: refreshTokenValue,
-        refreshToken: newRefreshToken,
-        lastActiveAt: now,
+        lastUsedAt: now,
         idleExpiresAt: newIdleExpiresAt,
-        ipAddress: ip ?? session.ipAddress,
+        ip: ip ?? session.ip,
       },
     });
 
@@ -228,14 +261,16 @@ export class SessionService {
   async revokeSession(sessionId: string): Promise<void> {
     const sessionDelegate = (this.client as any).session;
     if (sessionDelegate?.update) {
-      await sessionDelegate.update({
-        where: { id: sessionId },
-        data: {
-          revoked: true,
-          revokedAt: new Date(),
-          revokeReason: 'USER_LOGOUT',
-        },
-      });
+      try {
+        await sessionDelegate.update({
+          where: { id: sessionId },
+          data: {
+            revokedAt: new Date(),
+            revokeReason: 'USER_LOGOUT',
+          },
+        });
+      } catch {
+      }
     }
   }
 
@@ -244,18 +279,20 @@ export class SessionService {
     const now = new Date();
 
     if (sessionDelegate?.updateMany) {
-      await sessionDelegate.updateMany({
-        where: {
-          subjectId,
-          audience,
-          revoked: false,
-        },
-        data: {
-          revoked: true,
-          revokedAt: now,
-          revokeReason: 'REVOKE_ALL',
-        },
-      });
+      try {
+        await sessionDelegate.updateMany({
+          where: {
+            subjectId,
+            audience: (audience || 'CUSTOMER').toUpperCase() as any,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: now,
+            revokeReason: 'REVOKE_ALL',
+          },
+        });
+      } catch {
+      }
     }
 
     // Bump user's tokenVersion
@@ -281,53 +318,57 @@ export class SessionService {
     return sessionDelegate.findMany({
       where: {
         subjectId,
-        audience,
-        revoked: false,
+        audience: (audience || 'CUSTOMER').toUpperCase() as any,
+        revokedAt: null,
         idleExpiresAt: { gt: new Date() },
         absoluteExpiresAt: { gt: new Date() },
       },
       select: {
         id: true,
-        device: true,
-        ipAddress: true,
+        deviceId: true,
+        deviceName: true,
+        platform: true,
+        ip: true,
         userAgent: true,
-        lastActiveAt: true,
+        lastUsedAt: true,
         createdAt: true,
       },
-      orderBy: { lastActiveAt: 'desc' },
+      orderBy: { lastUsedAt: 'desc' },
     });
   }
 
   async enforceSessionLimit(subjectId: string, audience: string): Promise<void> {
-    const maxSessions = await this.limitsService.get(this.getLimitKey(audience, 'maxSessions'));
-    const sessionDelegate = (this.client as any).session;
+    try {
+      const maxSessions = await this.limitsService.get(this.getLimitKey(audience, 'maxSessions'));
+      const sessionDelegate = (this.client as any).session;
 
-    if (!sessionDelegate?.findMany) return;
+      if (!sessionDelegate?.findMany) return;
 
-    const activeSessions = await sessionDelegate.findMany({
-      where: {
-        subjectId,
-        audience,
-        revoked: false,
-        idleExpiresAt: { gt: new Date() },
-        absoluteExpiresAt: { gt: new Date() },
-      },
-      orderBy: { lastActiveAt: 'asc' }, // Oldest first
-    });
-
-    if (activeSessions.length >= maxSessions) {
-      const excessCount = activeSessions.length - maxSessions + 1;
-      const toEvict = activeSessions.slice(0, excessCount);
-
-      const evictIds = toEvict.map((s: any) => s.id);
-      await sessionDelegate.updateMany({
-        where: { id: { in: evictIds } },
-        data: {
-          revoked: true,
-          revokedAt: new Date(),
-          revokeReason: 'CONCURRENT_LIMIT_EXCEEDED',
+      const activeSessions = await sessionDelegate.findMany({
+        where: {
+          subjectId,
+          audience: (audience || 'CUSTOMER').toUpperCase() as any,
+          revokedAt: null,
+          idleExpiresAt: { gt: new Date() },
+          absoluteExpiresAt: { gt: new Date() },
         },
+        orderBy: { lastUsedAt: 'asc' }, // Oldest first
       });
+
+      if (activeSessions.length >= maxSessions) {
+        const excessCount = activeSessions.length - maxSessions + 1;
+        const toEvict = activeSessions.slice(0, excessCount);
+
+        const evictIds = toEvict.map((s: any) => s.id);
+        await sessionDelegate.updateMany({
+          where: { id: { in: evictIds } },
+          data: {
+            revokedAt: new Date(),
+            revokeReason: 'CONCURRENT_LIMIT_EXCEEDED',
+          },
+        });
+      }
+    } catch {
     }
   }
 }

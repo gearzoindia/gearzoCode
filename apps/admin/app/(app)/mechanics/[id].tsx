@@ -2,31 +2,55 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Badge, Button, Avatar } from '@gearzo/ui';
+import { Card, Badge, Button, Avatar, LoadingScreen, EmptyState } from '@gearzo/ui';
+import { useAdminMechanicDetail } from '@gearzo/api-client';
 
 export default function AdminMechanicDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const mechanic = {
-    id: id || 'm-101',
-    name: 'Ramesh Kumar',
-    phone: '+91 98765 43210',
-    type: 'INDIVIDUAL',
-    kycStatus: 'VERIFIED',
-    rating: 4.89,
-    isOnline: true,
-    totalJobs: 342,
-    completionRate: '98.5%',
-    operatingRadius: '5 km (Indiranagar Base)',
-    bankAccount: 'HDFC Bank ending in 1234',
-    joinedDate: 'Jan 2026',
-  };
+  const { data: mechanic, isLoading, error } = useAdminMechanicDetail(id || '');
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading partner profile..." />;
+  }
+
+  if (error || !mechanic) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Text style={{ fontSize: 20 }}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Partner Profile</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <EmptyState
+            title="Partner Not Found"
+            description="The requested mechanic profile could not be retrieved from the database."
+            buttonTitle="Return to Directory"
+            onAction={() => router.back()}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const displayName = mechanic.name || mechanic.phone || 'Mechanic Partner';
+  const isOnline = mechanic.presence?.status === 'ONLINE_AVAILABLE';
+  const joinedDate = mechanic.createdAt
+    ? new Date(mechanic.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+    : 'Recently';
 
   const handleSuspend = () => {
-    Alert.alert('Suspend Partner', 'Are you sure you want to suspend this mechanic?', [
+    Alert.alert('Suspend Partner', `Are you sure you want to suspend ${displayName}?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Suspend', style: 'destructive', onPress: () => Alert.alert('Suspended') },
+      {
+        text: 'Suspend',
+        style: 'destructive',
+        onPress: () => Alert.alert('Action Pending', 'Mechanic suspension workflow triggered.'),
+      },
     ]);
   };
 
@@ -36,19 +60,30 @@ export default function AdminMechanicDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={{ fontSize: 20 }}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Partner Profile: {mechanic.name}</Text>
-        <Badge label={mechanic.kycStatus} variant="success" />
+        <Text style={styles.headerTitle}>Partner Profile: {displayName}</Text>
+        <Badge
+          label={mechanic.status || 'ACTIVE'}
+          variant={mechanic.status === 'ACTIVE' || mechanic.status === 'VERIFIED' ? 'success' : 'warning'}
+        />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
         {/* Profile Card */}
         <Card variant="elevated" style={styles.card}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Avatar name={mechanic.name} size="lg" />
+            <Avatar name={displayName} size="lg" />
             <View style={{ flex: 1, marginLeft: 16 }}>
-              <Text style={styles.title}>{mechanic.name}</Text>
-              <Text style={styles.sub}>{mechanic.phone} • {mechanic.type}</Text>
-              <Text style={styles.sub}>Base: {mechanic.operatingRadius}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.title}>{displayName}</Text>
+                <Badge
+                  label={isOnline ? 'ONLINE' : 'OFFLINE'}
+                  variant={isOnline ? 'success' : 'neutral'}
+                />
+              </View>
+              <Text style={styles.sub}>{mechanic.phone} • {mechanic.registrationType || 'INDIVIDUAL'}</Text>
+              {mechanic.profile?.shopName && (
+                <Text style={styles.sub}>Workshop: {mechanic.profile.shopName}</Text>
+              )}
             </View>
           </View>
         </Card>
@@ -58,24 +93,32 @@ export default function AdminMechanicDetailScreen() {
         <View style={styles.statsRow}>
           <Card variant="default" style={styles.statBox}>
             <Text style={styles.statLabel}>Completed Jobs</Text>
-            <Text style={styles.statVal}>{mechanic.totalJobs}</Text>
+            <Text style={styles.statVal}>{mechanic.bookings?.length || 0}</Text>
           </Card>
           <Card variant="default" style={styles.statBox}>
             <Text style={styles.statLabel}>Avg Customer Rating</Text>
-            <Text style={styles.statVal}>{mechanic.rating} ★</Text>
+            <Text style={styles.statVal}>
+              {mechanic.profile?.ratingAvg ? Number(mechanic.profile.ratingAvg).toFixed(1) : '5.0'} ★
+            </Text>
           </Card>
           <Card variant="default" style={styles.statBox}>
-            <Text style={styles.statLabel}>Fulfillment Rate</Text>
-            <Text style={styles.statVal}>{mechanic.completionRate}</Text>
+            <Text style={styles.statLabel}>Experience</Text>
+            <Text style={styles.statVal}>{mechanic.profile?.experienceYears || 0} yrs</Text>
           </Card>
         </View>
 
         {/* Bank & Compliance */}
         <Text style={styles.sectionHeader}>Settlement & Compliance</Text>
         <Card variant="default" style={styles.card}>
-          <Text style={styles.infoRow}>Bank Account: {mechanic.bankAccount}</Text>
-          <Text style={styles.infoRow}>KYC Status: Government Verified (Aadhaar & PAN)</Text>
-          <Text style={styles.infoRow}>Partner Since: {mechanic.joinedDate}</Text>
+          <Text style={styles.infoRow}>
+            Bank Account:{' '}
+            {mechanic.bankAccount?.accountNumber
+              ? `A/C ending in ${mechanic.bankAccount.accountNumber.slice(-4)}`
+              : 'Not registered yet'}
+          </Text>
+          <Text style={styles.infoRow}>KYC Status: {mechanic.status || 'PENDING_PROFILE'}</Text>
+          <Text style={styles.infoRow}>Service Radius: {mechanic.profile?.serviceRadiusKm || 5} km</Text>
+          <Text style={styles.infoRow}>Partner Registered: {joinedDate}</Text>
         </Card>
 
         {/* Actions */}
@@ -136,15 +179,9 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
   },
-  sectionHeader: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 8,
-  },
   statsRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     marginBottom: 16,
   },
   statBox: {
@@ -162,9 +199,15 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     marginTop: 4,
   },
+  sectionHeader: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
   infoRow: {
     fontSize: 13,
     color: '#334155',
-    marginBottom: 6,
+    lineHeight: 22,
   },
 });

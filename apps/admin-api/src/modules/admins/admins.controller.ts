@@ -51,6 +51,18 @@ export class AdminsController {
     return this.adminsService.findAll(dto, currentAdmin, scope);
   }
 
+  @Get(':id')
+  @Permissions('ADMIN_MANAGE')
+  @ApiOperation({ summary: 'Get details of an administrator' })
+  async findOne(
+    @Param('id') id: string,
+    @CurrentAdmin() currentAdmin: AuthenticatedAdmin,
+    @Req() req: Request,
+  ) {
+    const scope = (req as any).jurisdictionScope;
+    return this.adminsService.findOne(id, currentAdmin, scope);
+  }
+
   @Post('invite')
   @Permissions('ADMIN_MANAGE')
   @ApiOperation({ summary: 'Invite new administrator (role must be lower, jurisdiction in subtree)' })

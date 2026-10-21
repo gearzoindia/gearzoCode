@@ -29,7 +29,7 @@ export class VehiclesMasterController {
   constructor(private readonly vehiclesMasterService: VehiclesMasterService) {}
 
   // Brands
-  @Get('vehicle-brands')
+  @Get(['vehicle-brands', 'vehicles/brands', 'admin/vehicles/brands'])
   @Permissions('CATALOGUE_MANAGE')
   @ApiOperation({ summary: 'List vehicle brands' })
   async findAllBrands() {

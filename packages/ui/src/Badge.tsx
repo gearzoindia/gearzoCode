@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleProp, ViewStyle, TextStyle } from 'react-native';
 
-export type BadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'coming-soon' | 'neutral';
+export type BadgeVariant = 'success' | 'warning' | 'error' | 'danger' | 'info' | 'coming-soon' | 'neutral';
 
 export interface BadgeProps {
   label: string;
@@ -20,6 +20,7 @@ export const Badge: React.FC<BadgeProps> = ({
     success: { bg: '#DCFCE7', text: '#15803D', border: '#BBF7D0' },
     warning: { bg: '#FEF3C7', text: '#B45309', border: '#FDE68A' },
     error: { bg: '#FEE2E2', text: '#B91C1C', border: '#FECACA' },
+    danger: { bg: '#FEE2E2', text: '#B91C1C', border: '#FECACA' },
     info: { bg: '#DBEAFE', text: '#1D4ED8', border: '#BFDBFE' },
     'coming-soon': { bg: '#FEF3C7', text: '#D97706', border: '#FDE68A' },
     neutral: { bg: '#F3F4F6', text: '#4B5563', border: '#E5E7EB' },

@@ -7,30 +7,13 @@ import { useAdminPayouts } from '@gearzo/api-client';
 
 export default function AdminPayoutsScreen() {
   const router = useRouter();
-  const { data: payouts } = useAdminPayouts();
-
-  const mockRuns = [
-    {
-      id: 'payout-run-2026-10-12',
-      period: '12 Oct 2026 (Daily Auto-Run)',
-      mechanicsCount: 42,
-      totalPaise: 9480000,
-      status: 'COMPLETED',
-      settlementTime: '12 Oct, 11:30 PM',
-    },
-    {
-      id: 'payout-run-2026-10-11',
-      period: '11 Oct 2026 (Daily Auto-Run)',
-      mechanicsCount: 38,
-      totalPaise: 8120000,
-      status: 'COMPLETED',
-      settlementTime: '11 Oct, 11:30 PM',
-    },
-  ];
+  const { data: payouts, isError } = useAdminPayouts();
 
   const handleInitiateManualRun = () => {
     Alert.alert('Batch Run Triggered', 'Processing automated IMPS batch disbursements with bank gateway.');
   };
+
+  const displayRuns = Array.isArray(payouts) ? payouts : [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -49,9 +32,18 @@ export default function AdminPayoutsScreen() {
       </View>
 
       <FlatList
-        data={mockRuns}
+        data={displayRuns}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', padding: 40 }}>
+            <Text style={{ fontSize: 32, marginBottom: 12 }}>💳</Text>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>No Payout Runs</Text>
+            <Text style={{ fontSize: 13, color: '#64748B', marginTop: 4, textAlign: 'center' }}>
+              No settlement batches generated yet. Click 'Run Manual Batch' to trigger one.
+            </Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <Card variant="default" style={styles.card}>
             <TouchableOpacity

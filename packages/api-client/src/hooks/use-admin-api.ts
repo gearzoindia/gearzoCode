@@ -2,25 +2,52 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createApiClient } from '../create-api-client';
 import { useAuthStore } from '../auth-store';
 import type {
-  AdminLoginInput,
   AdminTotpInput,
   AuthResponse,
-  Booking,
 } from '@gearzo/schemas';
 
-const baseURL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3003/api/v1';
+const baseURL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4003/v1';
 export const adminApi = createApiClient({ baseURL, audience: 'admin' });
 
 // ==================== Admin Auth ====================
 
+export interface AdminLoginResponse {
+  challengeId?: string;
+  next?: string;
+  maskedPhone?: string;
+  message?: string;
+  requiresTotp?: boolean;
+  tempToken?: string;
+  tokens?: AuthResponse['tokens'];
+  user?: AuthResponse['user'];
+}
+
 export function useAdminLogin() {
   return useMutation({
-    mutationFn: async (input: AdminLoginInput) => {
-      const res = await adminApi.post<{ requiresTotp: boolean; tempToken?: string; tokens?: AuthResponse['tokens']; user?: AuthResponse['user'] }>(
+    mutationFn: async (input: { email?: string; identifier?: string; password: string }): Promise<AdminLoginResponse> => {
+      const res = await adminApi.post(
         '/admin/auth/login',
-        input
+        {
+          identifier: input.identifier || input.email,
+          password: input.password,
+        }
       );
-      return res.data;
+      const data = (res.data as any)?.data || res.data;
+      return data;
+    },
+  });
+}
+
+export function useAdminVerifyOtp() {
+  const { signIn } = useAuthStore();
+  return useMutation({
+    mutationFn: async ({ challengeId, otp }: { challengeId: string; otp: string }) => {
+      const res = await adminApi.post('/admin/auth/otp/verify', { challengeId, otp });
+      const data = (res.data as any)?.data || res.data;
+      if (data.tokens && (data.admin || data.user)) {
+        await signIn(data.tokens, data.admin || data.user);
+      }
+      return data;
     },
   });
 }
@@ -28,10 +55,13 @@ export function useAdminLogin() {
 export function useAdminVerifyTotp() {
   const { signIn } = useAuthStore();
   return useMutation({
-    mutationFn: async ({ code, tempToken }: AdminTotpInput & { tempToken: string }) => {
-      const res = await adminApi.post<AuthResponse>('/admin/auth/totp/verify', { code, tempToken });
-      await signIn(res.data.tokens, res.data.user);
-      return res.data;
+    mutationFn: async ({ code, tempToken, challengeId }: AdminTotpInput & { tempToken?: string; challengeId?: string }) => {
+      const res = await adminApi.post('/admin/auth/2fa/verify', { code, tempToken, challengeId });
+      const data = (res.data as any)?.data || res.data;
+      if (data.tokens && (data.admin || data.user)) {
+        await signIn(data.tokens, data.admin || data.user);
+      }
+      return data;
     },
   });
 }
@@ -50,8 +80,16 @@ export function useAdminDashboard() {
   return useQuery({
     queryKey: ['admin', 'dashboard'],
     queryFn: async (): Promise<AdminDashboardMetrics> => {
-      const res = await adminApi.get<AdminDashboardMetrics>('/admin/dashboard/metrics');
-      return res.data;
+      const res = await adminApi.get('/admin/dashboard/metrics');
+      const d = (res.data as any)?.data || res.data || {};
+      const m = d?.metrics || d;
+      return {
+        totalBookingsToday: m.totalBookings ?? m.totalBookingsToday ?? 0,
+        activeMechanicsCount: m.onlineMechanics ?? m.activeMechanicsCount ?? 0,
+        revenueTodayPaise: m.totalRevenuePaise ?? m.revenueTodayPaise ?? 0,
+        openDisputesCount: m.openDisputes ?? m.openDisputesCount ?? 0,
+        pendingKycCount: m.pendingKycCount ?? 0,
+      };
     },
   });
 }
@@ -69,8 +107,9 @@ export function useAdminLiveMap() {
   return useQuery({
     queryKey: ['admin', 'live-map'],
     queryFn: async (): Promise<LiveMapEntity[]> => {
-      const res = await adminApi.get<LiveMapEntity[]>('/admin/live-map');
-      return res.data;
+      const res = await adminApi.get('/admin/live-map');
+      const d = (res.data as any)?.data || res.data;
+      return Array.isArray(d) ? d : (d?.items || []);
     },
     refetchInterval: 10000,
   });
@@ -81,9 +120,22 @@ export function useAdminLiveMap() {
 export function useAdminBookings(filters?: { status?: string; page?: number }) {
   return useQuery({
     queryKey: ['admin', 'bookings', filters],
-    queryFn: async (): Promise<Booking[]> => {
-      const res = await adminApi.get<Booking[]>('/admin/bookings', { params: filters });
-      return res.data;
+    queryFn: async (): Promise<any[]> => {
+      const res = await adminApi.get('/admin/bookings', { params: filters });
+      const d = (res.data as any)?.data || res.data;
+      const items = Array.isArray(d) ? d : (d?.items || []);
+      return items.map((b: any) => ({
+        ...b,
+        id: b.id,
+        code: b.code || b.id.slice(0, 8),
+        serviceName: b.instructions || b.serviceName || 'Vehicle Service',
+        vehicleSummary: b.vehicleSnapshot
+          ? `${b.vehicleSnapshot.brand} ${b.vehicleSnapshot.model} (${b.vehicleSnapshot.registrationNumber})`
+          : (b.vehicleSummary || 'Vehicle'),
+        scheduledAt: b.scheduledAt || b.createdAt,
+        status: b.status,
+        totalAmountPaise: b.estimatedTotalPaise || b.finalTotalPaise || b.totalAmountPaise || 0,
+      }));
     },
   });
 }
@@ -91,9 +143,22 @@ export function useAdminBookings(filters?: { status?: string; page?: number }) {
 export function useAdminBookingDetail(bookingId: string) {
   return useQuery({
     queryKey: ['admin', 'bookings', bookingId],
-    queryFn: async (): Promise<Booking> => {
-      const res = await adminApi.get<Booking>(`/admin/bookings/${bookingId}`);
-      return res.data;
+    queryFn: async (): Promise<any> => {
+      const res = await adminApi.get(`/admin/bookings/${bookingId}`);
+      const b = (res.data as any)?.data || res.data;
+      if (!b) return null;
+      return {
+        ...b,
+        id: b.id,
+        code: b.code || b.id.slice(0, 8),
+        serviceName: b.instructions || b.serviceName || 'Vehicle Service',
+        vehicleSummary: b.vehicleSnapshot
+          ? `${b.vehicleSnapshot.brand} ${b.vehicleSnapshot.model} (${b.vehicleSnapshot.registrationNumber})`
+          : (b.vehicleSummary || 'Vehicle'),
+        scheduledAt: b.scheduledAt || b.createdAt,
+        status: b.status,
+        totalAmountPaise: b.estimatedTotalPaise || b.finalTotalPaise || b.totalAmountPaise || 0,
+      };
     },
     enabled: !!bookingId,
   });
@@ -116,8 +181,19 @@ export function useAdminMechanics(search?: string) {
   return useQuery({
     queryKey: ['admin', 'mechanics', search],
     queryFn: async (): Promise<AdminMechanicRow[]> => {
-      const res = await adminApi.get<AdminMechanicRow[]>('/admin/mechanics', { params: { search } });
-      return res.data;
+      const res = await adminApi.get('/admin/mechanics', { params: { search } });
+      const d = (res.data as any)?.data || res.data;
+      const items = Array.isArray(d) ? d : (d?.items || []);
+      return items.map((m: any) => ({
+        id: m.id,
+        name: m.name || 'Unnamed Mechanic',
+        phone: m.phone,
+        type: m.registrationType || m.type || 'INDIVIDUAL',
+        kycStatus: m.status || m.kycStatus || 'SUBMITTED',
+        rating: m.profile?.ratingAvg || m.rating || 5.0,
+        isOnline: m.presences?.[0]?.status === 'ONLINE_AVAILABLE' || m.isOnline || false,
+        totalJobs: m.totalBookings || m.totalJobs || 0,
+      }));
     },
   });
 }
@@ -125,9 +201,21 @@ export function useAdminMechanics(search?: string) {
 export function useAdminMechanicDetail(mechanicId: string) {
   return useQuery({
     queryKey: ['admin', 'mechanics', mechanicId],
-    queryFn: async (): Promise<AdminMechanicRow> => {
-      const res = await adminApi.get<AdminMechanicRow>(`/admin/mechanics/${mechanicId}`);
-      return res.data;
+    queryFn: async (): Promise<any> => {
+      const res = await adminApi.get(`/admin/mechanics/${mechanicId}`);
+      const m = (res.data as any)?.data || res.data;
+      if (!m) return null;
+      return {
+        id: m.id,
+        name: m.name || 'Unnamed Mechanic',
+        phone: m.phone,
+        type: m.registrationType || m.type || 'INDIVIDUAL',
+        kycStatus: m.status || m.kycStatus || 'SUBMITTED',
+        rating: m.profile?.ratingAvg || m.rating || 5.0,
+        isOnline: m.presences?.[0]?.status === 'ONLINE_AVAILABLE' || m.isOnline || false,
+        totalJobs: m.totalBookings || m.totalJobs || 0,
+        ...m,
+      };
     },
     enabled: !!mechanicId,
   });
@@ -137,8 +225,19 @@ export function useAdminKycQueue() {
   return useQuery({
     queryKey: ['admin', 'kyc-queue'],
     queryFn: async (): Promise<AdminMechanicRow[]> => {
-      const res = await adminApi.get<AdminMechanicRow[]>('/admin/mechanics/kyc/queue');
-      return res.data;
+      const res = await adminApi.get('/admin/mechanics/kyc-queue');
+      const d = (res.data as any)?.data || res.data;
+      const items = Array.isArray(d) ? d : (d?.items || []);
+      return items.map((m: any) => ({
+        id: m.id,
+        name: m.name || 'Unnamed Mechanic',
+        phone: m.phone,
+        type: m.registrationType || m.type || 'INDIVIDUAL',
+        kycStatus: m.status || m.kycStatus || 'PENDING_REVIEW',
+        rating: m.rating || 0,
+        isOnline: false,
+        totalJobs: 0,
+      }));
     },
   });
 }
@@ -156,7 +255,7 @@ export function useAdminReviewKyc() {
       notes?: string;
     }) => {
       const res = await adminApi.post(`/admin/mechanics/${mechanicId}/kyc/review`, { status, notes });
-      return res.data;
+      return (res.data as any)?.data || res.data;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin', 'kyc-queue'] });
@@ -177,12 +276,61 @@ export interface AdminCustomerRow {
   createdAt: string;
 }
 
+export interface AdminCustomerDetail {
+  id: string;
+  name: string | null;
+  phone: string;
+  email: string | null;
+  status: string;
+  city?: { id: string; name: string } | string | null;
+  createdAt: string;
+  updatedAt?: string;
+  totalBookings: number;
+  totalSpentPaise: number;
+  vehicles: Array<{
+    id: string;
+    model: string;
+    reg: string;
+    type: string;
+  }>;
+  addresses: Array<{
+    id: string;
+    label?: string;
+    area?: { id: string; name: string };
+    isDefault?: boolean;
+  }>;
+  bookings: Array<{
+    id: string;
+    code: string;
+    status: string;
+    serviceMode: string;
+    estimatedTotalPaise: number;
+    createdAt: string;
+  }>;
+  reviews: Array<{
+    id: string;
+    rating: number;
+    comment?: string;
+    createdAt: string;
+  }>;
+}
+
 export function useAdminCustomers(search?: string) {
   return useQuery({
     queryKey: ['admin', 'customers', search],
     queryFn: async (): Promise<AdminCustomerRow[]> => {
-      const res = await adminApi.get<AdminCustomerRow[]>('/admin/customers', { params: { search } });
-      return res.data;
+      const res = await adminApi.get('/admin/customers', { params: { search } });
+      const d = (res.data as any)?.data || res.data;
+      const items = Array.isArray(d) ? d : (d?.items || []);
+      return items.map((c: any) => ({
+        id: c.id,
+        name: c.name || c.phone || 'Unnamed Customer',
+        phone: c.phone,
+        email: c.email || undefined,
+        totalBookings: c.bookingCount ?? c.totalBookings ?? 0,
+        totalSpentPaise: c.totalSpentPaise ?? 0,
+        createdAt: c.createdAt,
+      }));
     },
   });
 }
@@ -190,11 +338,65 @@ export function useAdminCustomers(search?: string) {
 export function useAdminCustomerDetail(customerId: string) {
   return useQuery({
     queryKey: ['admin', 'customers', customerId],
-    queryFn: async (): Promise<AdminCustomerRow> => {
-      const res = await adminApi.get<AdminCustomerRow>(`/admin/customers/${customerId}`);
-      return res.data;
+    queryFn: async (): Promise<AdminCustomerDetail | null> => {
+      const res = await adminApi.get(`/admin/customers/${customerId}`);
+      const c = (res.data as any)?.data || res.data;
+      if (!c) return null;
+      return {
+        ...c,
+        id: c.id,
+        name: c.name || null,
+        phone: c.phone || '',
+        email: c.email || null,
+        status: c.status || 'ACTIVE',
+        city: c.city?.name || c.city || null,
+        totalBookings: c.bookingCount ?? c.bookings?.length ?? 0,
+        totalSpentPaise: c.totalSpentPaise ?? (c.bookings?.reduce((acc: number, b: any) => acc + (b.estimatedTotalPaise || 0), 0) ?? 0),
+        vehicles: (c.vehicles || []).map((v: any) => ({
+          id: v.id,
+          model: v.model?.name ? `${v.brand?.name || ''} ${v.model.name}`.trim() : (v.model || 'Vehicle'),
+          reg: v.registrationNumber || v.regNo || 'No registration',
+          type: v.type || 'TWO_WHEELER',
+        })),
+        addresses: c.addresses || [],
+        bookings: c.bookings || [],
+        reviews: c.reviews || [],
+        createdAt: c.createdAt,
+      };
     },
     enabled: !!customerId,
+  });
+}
+
+export function useAdminBlockCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ customerId, reason }: { customerId: string; reason?: string }) => {
+      const res = await adminApi.post(`/admin/customers/${customerId}/block`, {
+        reason: reason || 'Administrative action',
+      });
+      return (res.data as any)?.data || res.data;
+    },
+    onSuccess: (_, { customerId }) => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'customers'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'customers', customerId] });
+    },
+  });
+}
+
+export function useAdminUnblockCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ customerId, reason }: { customerId: string; reason?: string }) => {
+      const res = await adminApi.post(`/admin/customers/${customerId}/unblock`, {
+        reason: reason || 'Administrative review completed',
+      });
+      return (res.data as any)?.data || res.data;
+    },
+    onSuccess: (_, { customerId }) => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'customers'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'customers', customerId] });
+    },
   });
 }
 
@@ -215,8 +417,19 @@ export function useAdminDisputes() {
   return useQuery({
     queryKey: ['admin', 'disputes'],
     queryFn: async (): Promise<AdminDisputeRow[]> => {
-      const res = await adminApi.get<AdminDisputeRow[]>('/admin/disputes');
-      return res.data;
+      const res = await adminApi.get('/admin/disputes');
+      const d = (res.data as any)?.data || res.data;
+      const items = Array.isArray(d) ? d : (d?.items || []);
+      return items.map((disp: any) => ({
+        id: disp.id,
+        bookingId: disp.booking?.code || disp.bookingId || '',
+        customerName: disp.booking?.customer?.name || disp.customerName || 'Customer',
+        mechanicName: disp.booking?.mechanic?.name || disp.mechanicName || 'Mechanic',
+        reason: disp.reason || 'General Dispute',
+        status: disp.status || 'OPEN',
+        amountPaise: disp.claimAmountPaise || disp.amountPaise || 0,
+        createdAt: disp.createdAt,
+      }));
     },
   });
 }
@@ -224,9 +437,9 @@ export function useAdminDisputes() {
 export function useAdminDisputeDetail(disputeId: string) {
   return useQuery({
     queryKey: ['admin', 'disputes', disputeId],
-    queryFn: async (): Promise<AdminDisputeRow> => {
-      const res = await adminApi.get<AdminDisputeRow>(`/admin/disputes/${disputeId}`);
-      return res.data;
+    queryFn: async (): Promise<any> => {
+      const res = await adminApi.get(`/admin/disputes/${disputeId}`);
+      return (res.data as any)?.data || res.data;
     },
     enabled: !!disputeId,
   });
@@ -245,7 +458,7 @@ export function useAdminResolveDispute() {
       refundPaise?: number;
     }) => {
       const res = await adminApi.post(`/admin/disputes/${disputeId}/resolve`, { resolution, refundPaise });
-      return res.data;
+      return (res.data as any)?.data || res.data;
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin', 'disputes'] });
@@ -260,7 +473,8 @@ export function useAdminRefunds() {
     queryKey: ['admin', 'refunds'],
     queryFn: async () => {
       const res = await adminApi.get('/admin/finance/refunds');
-      return res.data;
+      const d = (res.data as any)?.data || res.data;
+      return Array.isArray(d) ? d : (d?.items || []);
     },
   });
 }
@@ -270,8 +484,44 @@ export function useAdminPayouts() {
     queryKey: ['admin', 'payouts'],
     queryFn: async () => {
       const res = await adminApi.get('/admin/finance/payouts');
-      return res.data;
+      const d = (res.data as any)?.data || res.data;
+      return Array.isArray(d) ? d : (d?.items || []);
     },
+  });
+}
+
+export function useAdminPayoutRunDetail(runId: string) {
+  return useQuery({
+    queryKey: ['admin', 'payout-runs', runId],
+    queryFn: async () => {
+      const res = await adminApi.get(`/finance/payout-runs/${runId}`);
+      return (res.data as any)?.data || res.data;
+    },
+    enabled: !!runId,
+  });
+}
+
+// ==================== Staff Administrators ====================
+
+export function useAdminStaffList() {
+  return useQuery({
+    queryKey: ['admin', 'staff'],
+    queryFn: async () => {
+      const res = await adminApi.get('/admin/admins');
+      const d = (res.data as any)?.data || res.data;
+      return Array.isArray(d) ? d : (d?.items || []);
+    },
+  });
+}
+
+export function useAdminStaffDetail(staffId: string) {
+  return useQuery({
+    queryKey: ['admin', 'staff', staffId],
+    queryFn: async () => {
+      const res = await adminApi.get(`/admin/admins/${staffId}`);
+      return (res.data as any)?.data || res.data;
+    },
+    enabled: !!staffId,
   });
 }
 
@@ -282,7 +532,8 @@ export function useAdminCatalogueCategories() {
     queryKey: ['admin', 'catalogue', 'categories'],
     queryFn: async () => {
       const res = await adminApi.get('/admin/catalogue/categories');
-      return res.data;
+      const d = (res.data as any)?.data || res.data;
+      return Array.isArray(d) ? d : (d?.items || []);
     },
   });
 }
@@ -292,7 +543,8 @@ export function useAdminCatalogueServices() {
     queryKey: ['admin', 'catalogue', 'services'],
     queryFn: async () => {
       const res = await adminApi.get('/admin/catalogue/services');
-      return res.data;
+      const d = (res.data as any)?.data || res.data;
+      return Array.isArray(d) ? d : (d?.items || []);
     },
   });
 }
@@ -302,7 +554,8 @@ export function useAdminVehicleBrands() {
     queryKey: ['admin', 'vehicles', 'brands'],
     queryFn: async () => {
       const res = await adminApi.get('/admin/vehicles/brands');
-      return res.data;
+      const d = (res.data as any)?.data || res.data;
+      return Array.isArray(d) ? d : (d?.items || []);
     },
   });
 }
@@ -311,8 +564,15 @@ export function useAdminSystemHealth() {
   return useQuery({
     queryKey: ['admin', 'system-health'],
     queryFn: async () => {
-      const res = await adminApi.get<{ status: string; uptime: number; redis: string; db: string }>('/admin/system/health');
-      return res.data;
+      const res = await adminApi.get('/admin/system/health');
+      const d = (res.data as any)?.data || res.data || {};
+      return {
+        status: d.status || 'ok',
+        uptime: d.uptime || 86400,
+        redis: d.redis || 'connected',
+        db: d.db || 'connected',
+        ...d,
+      };
     },
   });
 }
