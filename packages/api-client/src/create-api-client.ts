@@ -46,7 +46,7 @@ export function createApiClient({ baseURL, audience }: { baseURL: string; audien
   // Request interceptor: attach Authorization: Bearer <access>
   instance.interceptors.request.use((config) => {
     const token = useAuthStore.getState().accessToken;
-    if (token && isLikelyJwt(token)) {
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;

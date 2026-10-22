@@ -1,45 +1,19 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Badge, Button } from '@gearzo/ui';
-
-interface AddressItem {
-  id: string;
-  tag: 'Home' | 'Work' | 'Other';
-  addressLine: string;
-  landmark?: string;
-  isDefault: boolean;
-}
+import { Card, Badge, Button, EmptyState, LoadingScreen } from '@gearzo/ui';
+import { useAddresses } from '@gearzo/api-client';
 
 export default function AddressesScreen() {
   const router = useRouter();
+  const { data: addresses, isLoading, refetch, isRefetching } = useAddresses();
 
-  const [addresses, setAddresses] = useState<AddressItem[]>([
-    {
-      id: 'addr-1',
-      tag: 'Home',
-      addressLine: 'Flat 402, Green Glen Layout, Bellandur, Bengaluru, Karnataka 560103',
-      landmark: 'Near Sobha Iris',
-      isDefault: true,
-    },
-    {
-      id: 'addr-2',
-      tag: 'Work',
-      addressLine: 'Building 4B, Ecospace Business Park, Outer Ring Road, Bengaluru 560103',
-      landmark: 'Tower B, 3rd Floor',
-      isDefault: false,
-    },
-  ]);
+  if (isLoading && !isRefetching) {
+    return <LoadingScreen message="Loading saved addresses..." />;
+  }
 
-  const handleMakeDefault = (id: string) => {
-    setAddresses((prev) =>
-      prev.map((a) => ({
-        ...a,
-        isDefault: a.id === id,
-      }))
-    );
-  };
+  const list = Array.isArray(addresses) ? addresses : [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -49,36 +23,45 @@ export default function AddressesScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Saved Addresses</Text>
         <TouchableOpacity onPress={() => router.push('/addresses/edit')} style={styles.backBtn}>
-          <Text style={{ fontSize: 20, color: '#1B5E20' }}>+</Text>
+          <Text style={{ fontSize: 24, color: '#16A34A', fontWeight: '700' }}>+</Text>
         </TouchableOpacity>
       </View>
 
       <FlatList
-        data={addresses}
+        data={list}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
-        renderItem={({ item }) => (
-          <Card variant="default" style={styles.card}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={{ fontSize: 18 }}>{item.tag === 'Home' ? '🏠' : '🏢'}</Text>
-                <Text style={styles.tagText}>{item.tag}</Text>
-                {item.isDefault && <Badge label="Default" variant="success" />}
+        contentContainerStyle={[styles.listContainer, list.length === 0 && { flex: 1, justifyContent: 'center' }]}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#16A34A" />}
+        ListEmptyComponent={
+          <EmptyState
+            title="No Addresses Saved"
+            description="Add your home, office or garage location for quick doorstep service booking."
+            buttonTitle="+ Add New Address"
+            onAction={() => router.push('/addresses/edit')}
+          />
+        }
+        renderItem={({ item }) => {
+          const labelUpper = (item.label || 'HOME').toUpperCase();
+          const icon = labelUpper === 'HOME' ? '🏠' : labelUpper === 'WORK' ? '🏢' : '📍';
+          const line = [item.line1, item.line2].filter(Boolean).join(', ');
+
+          return (
+            <Card variant="default" style={styles.card}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ fontSize: 18 }}>{icon}</Text>
+                  <Text style={styles.tagText}>{labelUpper}</Text>
+                  {item.isDefault && <Badge label="Default" variant="success" />}
+                </View>
               </View>
 
-              {!item.isDefault && (
-                <TouchableOpacity onPress={() => handleMakeDefault(item.id)}>
-                  <Text style={styles.makeDefaultText}>Set as Default</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <Text style={styles.addressLine}>{item.addressLine}</Text>
-            {item.landmark ? (
-              <Text style={styles.landmark}>Landmark: {item.landmark}</Text>
-            ) : null}
-          </Card>
-        )}
+              <Text style={styles.addressLine}>{line}</Text>
+              {item.landmark ? (
+                <Text style={styles.landmark}>Landmark: {item.landmark}</Text>
+              ) : null}
+            </Card>
+          );
+        }}
       />
 
       <View style={styles.bottomBar}>
@@ -119,40 +102,40 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
   },
+  listContainer: {
+    padding: 20,
+    paddingBottom: 100,
+  },
   card: {
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
+    gap: 6,
   },
   tagText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#111827',
   },
-  makeDefaultText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1B5E20',
-  },
   addressLine: {
-    fontSize: 13,
-    color: '#374151',
-    lineHeight: 18,
-    marginTop: 8,
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 20,
+    marginTop: 4,
   },
   landmark: {
     fontSize: 12,
     color: '#6B7280',
-    marginTop: 4,
+    fontStyle: 'italic',
   },
   bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 20,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
+    padding: 16,
   },
 });

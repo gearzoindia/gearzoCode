@@ -93,10 +93,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const storedUser = await getSecureItem(USER_KEY);
       const user = storedUser ? (JSON.parse(storedUser) as UserProfile) : null;
 
-      const validAccessToken = isLikelyJwt(storedAccessToken) ? storedAccessToken : null;
-      if (storedAccessToken && !validAccessToken) {
-        await removeSecureItem(ACCESS_TOKEN_KEY);
-      }
+      const validAccessToken = storedAccessToken || null;
 
       if (storedRefreshToken) {
         set({

@@ -44,7 +44,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="subscription"
         options={{
-          title: 'Pass',
+          title: 'Subscription',
           tabBarIcon: ({ color, focused }) => (
             <Text style={{ fontSize: focused ? 22 : 20, color }}>🛡️</Text>
           ),

@@ -9,20 +9,26 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth, useHome, useVehicles } from '@gearzo/api-client';
-import { Card, Badge, VehicleCard, ServiceCard, LoadingScreen, ErrorScreen } from '@gearzo/ui';
+import { useAuth, useHome, useVehicles, useServices } from '@gearzo/api-client';
+import { LoadingScreen, ErrorScreen } from '@gearzo/ui';
 
 export default function CustomerHomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { data: homeData, isLoading, isError, refetch, isRefetching } = useHome();
   const { data: vehicles } = useVehicles();
+  const { data: quickServices } = useServices('cat_book_mechanic', 'TWO_WHEELER');
 
   const vehicleList = Array.isArray(vehicles) ? vehicles : [];
-  const primaryVehicle = vehicleList.find((v) => v.isDefault) || vehicleList[0];
-  const userName = user?.name ? user.name.split(' ')[0] : 'Driver';
+  const primaryVehicle =
+    vehicleList.find((v) => v.isDefault) ||
+    vehicleList[0] ||
+    null;
 
-  if (isLoading) {
+  const userName = user?.name ? user.name.split(' ')[0] : (user?.phone || 'Customer');
+  const userCity = user?.city || 'Select Location';
+
+  if (isLoading && !isRefetching) {
     return <LoadingScreen message="Loading GearZo services..." />;
   }
 
@@ -31,619 +37,531 @@ export default function CustomerHomeScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#1B5E20" />
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#16A34A" />
         }
       >
-        {/* Dark Green Header */}
-        <View style={styles.header}>
-          <SafeAreaView edges={['top', 'left', 'right']}>
-            <View style={styles.headerTop}>
-              <View>
-                <Text style={styles.greeting}>Hey, {userName} 👋</Text>
-                <TouchableOpacity
-                  style={styles.locationContainer}
-                  onPress={() => router.push('/addresses')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Change location"
-                >
-                  <Text style={styles.locationIcon}>📍</Text>
-                  <Text style={styles.locationText} numberOfLines={1}>
-                    {user?.city || 'Bengaluru, India'}
-                  </Text>
-                  <Text style={styles.dropdownArrow}>▼</Text>
-                </TouchableOpacity>
-              </View>
+        {/* 1. Header (Screen 1): Greeting, Address with Dropdown, Bell Icon */}
+        <View style={styles.hh}>
+          <View>
+            <Text style={styles.greetingTitle}>Hey, {userName} 👋</Text>
+            <TouchableOpacity
+              style={styles.locationRow}
+              onPress={() => router.push('/addresses')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.pinIcon}>📍</Text>
+              <Text style={styles.locationText} numberOfLines={1}>
+                {userCity}
+              </Text>
+              <Text style={styles.dropdownIcon}>▼</Text>
+            </TouchableOpacity>
+          </View>
 
-              <TouchableOpacity
-                style={styles.bellButton}
-                accessibilityRole="button"
-                accessibilityLabel="Notifications"
-                onPress={() => router.push('/profile/upcoming')}
-              >
-                <Text style={{ fontSize: 20 }}>🔔</Text>
-                <View style={styles.notificationDot} />
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
-        </View>
-
-        {/* Search Bar (Overlapping Header) */}
-        <View style={styles.searchOverlapContainer}>
           <TouchableOpacity
-            style={styles.searchBar}
-            onPress={() => router.push('/search')}
-            activeOpacity={0.9}
-            accessibilityRole="search"
-            accessibilityLabel="Search vehicle services and repairs"
+            style={styles.bellButton}
+            onPress={() => router.push('/profile/upcoming')}
           >
-            <Text style={{ fontSize: 18, marginRight: 8 }}>🔍</Text>
-            <Text style={styles.searchPlaceholder}>
-              Search "Brake pads", "Oil change", "Periodic service"
-            </Text>
+            <Text style={{ fontSize: 18 }}>🔔</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.bodyPadding}>
-          {/* Selected Vehicle or Add Vehicle Prompt */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Your Vehicle</Text>
-            {primaryVehicle && (
-              <TouchableOpacity onPress={() => router.push('/vehicles/add')}>
-                <Text style={styles.linkText}>+ Add another</Text>
-              </TouchableOpacity>
-            )}
+        {/* 2. Search Bar: "Search service, repair or mechanic…" */}
+        <TouchableOpacity
+          style={styles.searchBar}
+          onPress={() => router.push('/search')}
+          activeOpacity={0.9}
+        >
+          <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
+          <Text style={styles.searchPlaceholder}>
+            Search service, repair or mechanic…
+          </Text>
+        </TouchableOpacity>
+
+        {/* 3. Selected Vehicle Card (Screen 1) */}
+        {primaryVehicle ? (
+          <TouchableOpacity
+            style={styles.vehicleCard}
+            onPress={() => router.push('/vehicles/add')}
+            activeOpacity={0.9}
+          >
+            <View style={styles.vehicleIconBox}>
+              <Text style={{ fontSize: 20 }}>
+                {primaryVehicle.type === 'FOUR_WHEELER' ? '🚗' : '🏍️'}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.vehicleTitle}>
+                {primaryVehicle.brand ? `${primaryVehicle.brand} ` : ''}{primaryVehicle.model}{' '}
+                {primaryVehicle.registrationNumber ? (
+                  <Text style={styles.vehicleReg}>
+                    ({primaryVehicle.registrationNumber})
+                  </Text>
+                ) : null}
+              </Text>
+              <View style={styles.chipsRow}>
+                <View style={styles.statusChip}>
+                  <Text style={styles.statusChipText}>✓ Verified</Text>
+                </View>
+              </View>
+            </View>
+            <Text style={styles.vehicleDropdownArrow}>▼</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.vehicleCard}
+            onPress={() => router.push('/vehicles/add')}
+            activeOpacity={0.9}
+          >
+            <View style={styles.vehicleIconBox}>
+              <Text style={{ fontSize: 20 }}>🛵</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.vehicleTitle}>No vehicle registered yet</Text>
+              <Text style={[styles.vehicleReg, { color: '#16A34A', fontWeight: '600' }]}>
+                + Tap to add your 2W or 4W
+              </Text>
+            </View>
+            <Text style={styles.vehicleDropdownArrow}>→</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* 4. First Booking Promo Card (Screen 1) */}
+        <View style={styles.bodyWrap}>
+          <TouchableOpacity
+            style={styles.firstBookingPromo}
+            onPress={() => router.push({ pathname: '/services', params: { vehicleType: 'TWO_WHEELER' } })}
+            activeOpacity={0.9}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.promoBigOffer}>₹150 OFF</Text>
+              <Text style={styles.promoSub}>on 1st booking</Text>
+              <View style={styles.featureTagsRow}>
+                <View style={styles.featureTag}>
+                  <Text style={styles.featureTagText}>Quick{'\n'}Service</Text>
+                </View>
+                <View style={styles.featureTag}>
+                  <Text style={styles.featureTagText}>Trusted{'\n'}Mechanics</Text>
+                </View>
+                <View style={styles.featureTag}>
+                  <Text style={styles.featureTagText}>Premium{'\n'}Care</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.promoGraphicWrap}>
+              <Text style={{ fontSize: 44 }}>⚡</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* 5. 2x2 Category Grid (Screen 1) */}
+          <View style={styles.categoryGrid}>
+            {/* 2-WHEELER */}
+            <TouchableOpacity
+              style={styles.gridTile}
+              onPress={() =>
+                router.push({
+                  pathname: '/services',
+                  params: { vehicleType: 'TWO_WHEELER' },
+                })
+              }
+            >
+              <Text style={styles.tileHeading}>2-WHEELER</Text>
+              <Text style={styles.tileSub}>Service</Text>
+              <Text style={styles.tileIcon}>🏍️</Text>
+            </TouchableOpacity>
+
+            {/* 4-WHEELER */}
+            <TouchableOpacity
+              style={styles.gridTile}
+              onPress={() =>
+                router.push({
+                  pathname: '/services',
+                  params: { vehicleType: 'FOUR_WHEELER' },
+                })
+              }
+            >
+              <Text style={styles.tileHeading}>4-WHEELER</Text>
+              <Text style={styles.tileSub}>Service</Text>
+              <Text style={styles.tileIcon}>🚗</Text>
+            </TouchableOpacity>
+
+            {/* WASHING & Detailing (Coming Soon) */}
+            <View style={styles.gridTile}>
+              <Text style={styles.tileHeading}>WASHING</Text>
+              <Text style={styles.tileSub}>& Detailing</Text>
+              <View style={styles.comingSoonBadge}>
+                <Text style={styles.comingSoonText}>Coming Soon</Text>
+              </View>
+              <Text style={styles.tileIcon}>🚿</Text>
+            </View>
+
+            {/* SHOP NOW Spares & Acc. (Coming Soon) */}
+            <View style={styles.gridTile}>
+              <Text style={styles.tileHeading}>SHOP NOW</Text>
+              <Text style={styles.tileSub}>Spares & Acc.</Text>
+              <View style={styles.comingSoonBadge}>
+                <Text style={styles.comingSoonText}>Coming Soon</Text>
+              </View>
+              <Text style={styles.tileIcon}>🛒</Text>
+            </View>
           </View>
 
-          {primaryVehicle ? (
-            <VehicleCard
-              id={primaryVehicle.id}
-              type={primaryVehicle.type || primaryVehicle.vehicleTypeId || 'FOUR_WHEELER'}
-              brand={primaryVehicle.brand || primaryVehicle.brandName || 'Vehicle'}
-              model={primaryVehicle.model || primaryVehicle.modelName || ''}
-              registrationNumber={primaryVehicle.registrationNumber || primaryVehicle.regNumber || ''}
-              isDefault={primaryVehicle.isDefault}
-              onPress={() => router.push(`/vehicles/${primaryVehicle.id}`)}
-            />
-          ) : (
-            <Card variant="outlined" style={styles.addVehiclePromptCard}>
-              <View style={styles.promptContent}>
-                <View style={styles.promptIconWrap}>
-                  <Text style={{ fontSize: 28 }}>🚗</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.promptTitle}>No Vehicle Added</Text>
-                  <Text style={styles.promptDesc}>
-                    Add your vehicle for instant quote matching and scheduled maintenance
+          {/* 6. Gearzo Care+ Banner (Screen 1) */}
+          <TouchableOpacity
+            style={styles.gearzoCareBanner}
+            onPress={() => router.push('/(app)/(tabs)/subscription')}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.careBannerTitle}>Gearzo care+</Text>
+            <View style={styles.saveBadge}>
+              <Text style={styles.saveBadgeText}>Save up to ₹3000</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* 7. Quick Doorstep Services Live List */}
+          <View style={styles.quickServicesHeader}>
+            <Text style={styles.quickServicesTitle}>Popular Services</Text>
+            <TouchableOpacity onPress={() => router.push('/services')}>
+              <Text style={styles.viewAllText}>View All ›</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ gap: 10 }}>
+            {(quickServices || []).slice(0, 3).map((s) => (
+              <TouchableOpacity
+                key={s.id}
+                style={styles.popularServiceRow}
+                onPress={() => router.push(`/services/${s.id}`)}
+              >
+                <View style={styles.popularIconWrap}>
+                  <Text style={{ fontSize: 22 }}>
+                    {s.name.includes('Check') ? '📋' : s.name.includes('Call') ? '📞' : '🔧'}
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity
-                style={styles.promptButton}
-                onPress={() => router.push('/vehicles/add')}
-                accessibilityRole="button"
-              >
-                <Text style={styles.promptButtonText}>+ Add Vehicle Now</Text>
+                <View style={{ flex: 1, paddingHorizontal: 10 }}>
+                  <Text style={styles.popularServiceName}>{s.name}</Text>
+                  <Text style={styles.popularServiceSub}>
+                    ⏱️ {s.durationMinutes} mins • {s.description?.slice(0, 45)}...
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.popularServicePrice}>
+                    ₹{Math.round(((s.pricePaise ?? (s as any).basePricePaise ?? 0)) / 100)}
+                  </Text>
+                  <Text style={styles.bookNowSmall}>Book ›</Text>
+                </View>
               </TouchableOpacity>
-            </Card>
-          )}
-
-          {/* Promo Banner Carousel */}
-          <View style={styles.promoBanner}>
-            <View style={{ flex: 1 }}>
-              <Badge label="LIMITED OFFER" variant="warning" />
-              <Text style={styles.promoTitle}>Monsoon Health Checkup</Text>
-              <Text style={styles.promoSubtitle}>Flat 20% OFF on all 30-point inspections</Text>
-              <TouchableOpacity
-                style={styles.promoCta}
-                onPress={() => router.push('/services')}
-              >
-                <Text style={styles.promoCtaText}>Book Now →</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={{ fontSize: 44, marginLeft: 12 }}>🌧️</Text>
-          </View>
-
-          {/* 2x2 Grid Categories */}
-          <Text style={styles.sectionTitle}>Explore Categories</Text>
-          <View style={styles.categoryGrid}>
-            <TouchableOpacity
-              style={styles.gridCard}
-              onPress={() => router.push({ pathname: '/services', params: { vehicleType: 'TWO_WHEELER' } })}
-              accessibilityRole="button"
-            >
-              <Text style={styles.gridIcon}>🛵</Text>
-              <Text style={styles.gridTitle}>2-Wheeler Service</Text>
-              <Text style={styles.gridSub}>Bikes & Scooters</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.gridCard}
-              onPress={() => router.push({ pathname: '/services', params: { vehicleType: 'FOUR_WHEELER' } })}
-              accessibilityRole="button"
-            >
-              <Text style={styles.gridIcon}>🚗</Text>
-              <Text style={styles.gridTitle}>4-Wheeler Service</Text>
-              <Text style={styles.gridSub}>Cars & SUVs</Text>
-            </TouchableOpacity>
-
-            <View style={[styles.gridCard, styles.gridCardDisabled]}>
-              <View style={styles.badgeTopRight}>
-                <Badge label="Soon" variant="neutral" />
-              </View>
-              <Text style={styles.gridIcon}>🚿</Text>
-              <Text style={styles.gridTitle}>Eco Wash & Detailing</Text>
-              <Text style={styles.gridSub}>Doorstep waterless</Text>
-            </View>
-
-            <View style={[styles.gridCard, styles.gridCardDisabled]}>
-              <View style={styles.badgeTopRight}>
-                <Badge label="Soon" variant="neutral" />
-              </View>
-              <Text style={styles.gridIcon}>🛒</Text>
-              <Text style={styles.gridTitle}>Shop Parts & Tyres</Text>
-              <Text style={styles.gridSub}>Genuine spares</Text>
-            </View>
-          </View>
-
-          {/* Quick Services Section */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Quick Doorstep Services</Text>
-            <TouchableOpacity onPress={() => router.push('/services')}>
-              <Text style={styles.linkText}>View all</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={{ gap: 12, marginBottom: 24 }}>
-            {homeData?.quickServices?.slice(0, 3).map((item) => (
-              <ServiceCard
-                key={item.id}
-                name={item.name}
-                durationMinutes={item.durationMinutes}
-                pricePaise={item.basePricePaise}
-                description={item.description}
-                onSelect={() => router.push(`/services/${item.id}`)}
-              />
-            )) || (
-              <>
-                <ServiceCard
-                  name="Periodic General Service"
-                  durationMinutes={90}
-                  pricePaise={149900}
-                  originalPricePaise={199900}
-                  badge="Popular"
-                  description="Engine oil flush, spark plug clean, air filter inspection, chain lube & wash"
-                  onSelect={() => router.push('/services')}
-                />
-                <ServiceCard
-                  name="Brake Pad Replacement & Bleed"
-                  durationMinutes={45}
-                  pricePaise={69900}
-                  description="Front and rear brake inspection, shoe/pad change and hydraulic bleeding"
-                  onSelect={() => router.push('/services')}
-                />
-              </>
-            )}
-          </View>
-
-          {/* Service Packages, Specific Repair, Book a Mechanic cards */}
-          <Text style={styles.sectionTitle}>Tailored For You</Text>
-          <View style={{ gap: 12, marginBottom: 24 }}>
-            <Card variant="elevated">
-              <TouchableOpacity
-                onPress={() => router.push('/services')}
-                style={{ flexDirection: 'row', alignItems: 'center' }}
-              >
-                <View style={[styles.tileIconWrap, { backgroundColor: '#E8F5E9' }]}>
-                  <Text style={{ fontSize: 24 }}>📦</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.tileTitle}>Comprehensive Packages</Text>
-                  <Text style={styles.tileSub}>Silver, Gold & Platinum routine service bundles</Text>
-                </View>
-                <Text style={{ fontSize: 20, color: '#9CA3AF' }}>›</Text>
-              </TouchableOpacity>
-            </Card>
-
-            <Card variant="elevated">
-              <TouchableOpacity
-                onPress={() => router.push('/services')}
-                style={{ flexDirection: 'row', alignItems: 'center' }}
-              >
-                <View style={[styles.tileIconWrap, { backgroundColor: '#E0F2FE' }]}>
-                  <Text style={{ fontSize: 24 }}>🔧</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.tileTitle}>Specific Repair & Diagnostics</Text>
-                  <Text style={styles.tileSub}>Starting issues, overheating, battery jump start</Text>
-                </View>
-                <Text style={{ fontSize: 20, color: '#9CA3AF' }}>›</Text>
-              </TouchableOpacity>
-            </Card>
-
-            <Card variant="elevated">
-              <TouchableOpacity
-                onPress={() => router.push('/services')}
-                style={{ flexDirection: 'row', alignItems: 'center' }}
-              >
-                <View style={[styles.tileIconWrap, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={{ fontSize: 24 }}>⚡</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.tileTitle}>Book an Instant Mechanic</Text>
-                  <Text style={styles.tileSub}>Nearest verified technician arrives within 30 mins</Text>
-                </View>
-                <Text style={{ fontSize: 20, color: '#9CA3AF' }}>›</Text>
-              </TouchableOpacity>
-            </Card>
-          </View>
-
-          {/* Car Service CTA Banner */}
-          <View style={styles.carBanner}>
-            <Text style={styles.carBannerTitle}>Premium Car Care at Home</Text>
-            <Text style={styles.carBannerDesc}>
-              Certified technicians equipped with OBD-II diagnostic tools and OEM fluids.
-            </Text>
-            <TouchableOpacity
-              style={styles.carBannerBtn}
-              onPress={() => router.push({ pathname: '/services', params: { vehicleType: 'FOUR_WHEELER' } })}
-            >
-              <Text style={styles.carBannerBtnText}>Schedule Car Service</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* GearZo Promise Section */}
-          <Text style={styles.sectionTitle}>The GearZo Promise</Text>
-          <View style={styles.promiseGrid}>
-            <View style={styles.promiseItem}>
-              <Text style={styles.promiseIcon}>🛡️</Text>
-              <Text style={styles.promiseTitle}>1000 km Warranty</Text>
-              <Text style={styles.promiseSub}>Service backed by 30-day warranty</Text>
-            </View>
-            <View style={styles.promiseItem}>
-              <Text style={styles.promiseIcon}>💰</Text>
-              <Text style={styles.promiseTitle}>Upfront Pricing</Text>
-              <Text style={styles.promiseSub}>Zero hidden charges or surprises</Text>
-            </View>
-            <View style={styles.promiseItem}>
-              <Text style={styles.promiseIcon}>✅</Text>
-              <Text style={styles.promiseTitle}>Verified Mechanics</Text>
-              <Text style={styles.promiseSub}>Background & skill checked pros</Text>
-            </View>
-            <View style={styles.promiseItem}>
-              <Text style={styles.promiseIcon}>📍</Text>
-              <Text style={styles.promiseTitle}>Live Tracking</Text>
-              <Text style={styles.promiseSub}>GPS arrival & service status updates</Text>
-            </View>
+            ))}
           </View>
         </View>
       </ScrollView>
-
-      {/* Floating Support Button */}
-      <TouchableOpacity
-        style={styles.floatingHelp}
-        onPress={() => router.push('/profile/help')}
-        accessibilityRole="button"
-        accessibilityLabel="Customer support chat"
-      >
-        <Text style={{ fontSize: 20, marginRight: 6 }}>💬</Text>
-        <Text style={styles.floatingHelpText}>Support</Text>
-      </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
   },
-  header: {
-    backgroundColor: '#1B5E20',
-    paddingHorizontal: 20,
-    paddingBottom: 36,
-  },
-  headerTop: {
+  hh: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 6,
   },
-  greeting: {
-    fontSize: 22,
+  greetingTitle: {
+    fontSize: 18,
     fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
+    color: '#0F1F16',
   },
-  locationContainer: {
+  locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 2,
   },
-  locationIcon: {
-    fontSize: 14,
+  pinIcon: {
+    fontSize: 12,
     marginRight: 4,
   },
   locationText: {
-    fontSize: 14,
-    color: '#E8F5E9',
-    fontWeight: '500',
-    maxWidth: 200,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6B7C72',
+    maxWidth: 180,
   },
-  dropdownArrow: {
-    fontSize: 10,
-    color: '#C8E6C9',
-    marginLeft: 6,
+  dropdownIcon: {
+    fontSize: 9,
+    color: '#6B7C72',
+    marginLeft: 4,
   },
   bellButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F2F4F3',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
-  },
-  notificationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FF5722',
-    position: 'absolute',
-    top: 10,
-    right: 12,
-  },
-  searchOverlapContainer: {
-    paddingHorizontal: 20,
-    marginTop: -22,
-    marginBottom: 16,
   },
   searchBar: {
+    marginHorizontal: 14,
+    marginTop: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E3EAE5',
+    borderRadius: 24,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 50,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    shadowColor: '#0B4A27',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 2,
   },
   searchPlaceholder: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    flex: 1,
+    fontSize: 12,
+    color: '#6B7C72',
   },
-  bodyPadding: {
-    paddingHorizontal: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  linkText: {
-    fontSize: 14,
-    color: '#1B5E20',
-    fontWeight: '600',
-  },
-  addVehiclePromptCard: {
-    marginBottom: 20,
-    padding: 16,
-  },
-  promptContent: {
+  vehicleCard: {
+    marginHorizontal: 14,
+    marginTop: 10,
+    backgroundColor: '#F2F4F3',
+    borderRadius: 16,
+    padding: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    gap: 10,
   },
-  promptIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F3F4F6',
+  vehicleIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#E3F6EA',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
-  promptTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
+  vehicleTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F1F16',
   },
-  promptDesc: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 2,
+  vehicleReg: {
+    fontStyle: 'normal',
+    fontWeight: '500',
+    color: '#6B7C72',
+    fontSize: 11.5,
   },
-  promptButton: {
-    backgroundColor: '#1B5E20',
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
+  chipsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 5,
   },
-  promptButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+  statusChip: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  promoBanner: {
-    backgroundColor: '#0D3811',
+  statusChipText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#0B4A27',
+  },
+  vehicleDropdownArrow: {
+    fontSize: 10,
+    color: '#6B7C72',
+    paddingRight: 4,
+  },
+  bodyWrap: {
+    paddingHorizontal: 14,
+    paddingTop: 10,
+  },
+  firstBookingPromo: {
+    backgroundColor: '#EAF7EE',
     borderRadius: 16,
-    padding: 18,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 18,
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#D5EFDE',
   },
-  promoTitle: {
-    fontSize: 17,
+  promoBigOffer: {
+    fontSize: 28,
     fontWeight: '800',
-    color: '#FFFFFF',
-    marginTop: 6,
+    color: '#16A34A',
+    lineHeight: 32,
   },
-  promoSubtitle: {
-    fontSize: 12,
-    color: '#A5D6A7',
+  promoSub: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F1F16',
     marginTop: 2,
-    marginBottom: 10,
   },
-  promoCta: {
+  featureTagsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  featureTag: {
     backgroundColor: '#FFFFFF',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
     borderRadius: 6,
   },
-  promoCtaText: {
-    color: '#1B5E20',
-    fontSize: 12,
+  featureTagText: {
+    fontSize: 8.5,
     fontWeight: '700',
+    color: '#6B7C72',
+    lineHeight: 11,
+    textAlign: 'center',
+  },
+  promoGraphicWrap: {
+    paddingLeft: 10,
   },
   categoryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
+    gap: 10,
+    marginTop: 12,
   },
-  gridCard: {
+  gridTile: {
     width: '48%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderWidth: 1.5,
+    borderColor: '#E3EAE5',
+    borderRadius: 16,
+    padding: 12,
+    height: 100,
     position: 'relative',
+    shadowColor: '#0B4A27',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 2,
   },
-  gridCardDisabled: {
-    opacity: 0.75,
-    backgroundColor: '#F9FAFB',
-  },
-  badgeTopRight: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
-  gridIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  gridTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  gridSub: {
+  tileHeading: {
     fontSize: 12,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  tileIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  tileTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: '800',
+    color: '#0F1F16',
   },
   tileSub: {
-    fontSize: 12,
-    color: '#6B7280',
+    color: '#6B7C72',
+    fontSize: 11,
     marginTop: 2,
   },
-  carBanner: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
+  tileIcon: {
+    position: 'absolute',
+    right: 12,
+    bottom: 10,
+    fontSize: 24,
   },
-  carBannerTitle: {
-    fontSize: 18,
+  comingSoonBadge: {
+    position: 'absolute',
+    left: 0,
+    bottom: 12,
+    backgroundColor: '#FACC15',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+  comingSoonText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    color: '#0B2A18',
+  },
+  gearzoCareBanner: {
+    marginTop: 12,
+    backgroundColor: '#0B2A18',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  careBannerTitle: {
+    fontSize: 15,
     fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: 4,
   },
-  carBannerDesc: {
-    fontSize: 13,
-    color: '#94A3B8',
-    lineHeight: 18,
-    marginBottom: 14,
-  },
-  carBannerBtn: {
-    backgroundColor: '#2E7D32',
-    paddingVertical: 10,
+  saveBadge: {
+    backgroundColor: '#FACC15',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: 8,
-    alignItems: 'center',
   },
-  carBannerBtnText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+  saveBadgeText: {
+    color: '#0B2A18',
+    fontWeight: '800',
+    fontSize: 10,
   },
-  promiseGrid: {
+  quickServicesHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 18,
+    marginBottom: 8,
   },
-  promiseItem: {
-    width: '48%',
-    backgroundColor: '#FFFFFF',
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  promiseIcon: {
-    fontSize: 24,
-    marginBottom: 6,
-  },
-  promiseTitle: {
+  quickServicesTitle: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: '800',
+    color: '#0F1F16',
   },
-  promiseSub: {
-    fontSize: 11,
-    color: '#6B7280',
+  viewAllText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#16A34A',
+  },
+  popularServiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E3EAE5',
+    borderRadius: 14,
+    padding: 10,
+    shadowColor: '#0B4A27',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  popularIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#E3F6EA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  popularServiceName: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#0F1F16',
+  },
+  popularServiceSub: {
+    fontSize: 10,
+    color: '#6B7C72',
     marginTop: 2,
   },
-  floatingHelp: {
-    position: 'absolute',
-    bottom: 24,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1B5E20',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
+  popularServicePrice: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F1F16',
   },
-  floatingHelpText: {
-    color: '#FFFFFF',
+  bookNowSmall: {
+    fontSize: 10.5,
     fontWeight: '700',
-    fontSize: 14,
+    color: '#16A34A',
+    marginTop: 2,
   },
 });

@@ -20,16 +20,7 @@ export class ProfileService {
       }
     } catch {}
 
-    return {
-      id: userId,
-      phone: '+919876543210',
-      name: 'GearZo Customer',
-      email: 'customer@gearzo.in',
-      avatarUrl: null,
-      isProfileComplete: true,
-      walletBalancePaise: 50000,
-      createdAt: new Date().toISOString(),
-    };
+    throw new NotFoundException('Customer profile not found: ' + userId);
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {

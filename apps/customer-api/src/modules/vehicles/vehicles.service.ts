@@ -99,21 +99,7 @@ export class VehiclesService {
         isDefault: vehicle.isDefault ?? false,
       };
     } catch {
-      return {
-        id,
-        customerId,
-        vehicleTypeId: 'vt_2w',
-        type: 'TWO_WHEELER',
-        brand: 'Honda',
-        brandName: 'Honda',
-        model: 'Activa 6G',
-        modelName: 'Activa 6G',
-        registrationNumber: 'KA01AB1234',
-        regNumber: 'KA01AB1234',
-        fuelType: 'PETROL',
-        year: 2022,
-        isDefault: true,
-      };
+      throw new NotFoundException('Vehicle not found: ' + id);
     }
   }
 

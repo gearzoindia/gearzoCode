@@ -107,6 +107,29 @@ export function useSearchServices(query: string) {
   });
 }
 
+export interface ProductItem {
+  id: string;
+  name: string;
+  specification: string;
+  pricePaise: number;
+  originalPricePaise?: number;
+  discountText?: string | null;
+  category: string;
+  compatibleVehicleTypes: string[];
+}
+
+export function useProducts(vehicleType?: string) {
+  return useQuery({
+    queryKey: ['customer', 'products', vehicleType],
+    queryFn: async (): Promise<ProductItem[]> => {
+      const res = await customerApi.get<ProductItem[]>('/customer/products', {
+        params: { vehicleTypeId: vehicleType },
+      });
+      return res.data;
+    },
+  });
+}
+
 // ==================== Vehicles ====================
 
 export function useVehicles() {
@@ -244,6 +267,66 @@ export function useSubscriptions() {
     queryFn: async (): Promise<SubscriptionPlan[]> => {
       const res = await customerApi.get<SubscriptionPlan[]>('/customer/subscriptions/plans');
       return res.data;
+    },
+  });
+}
+
+
+// ==================== Addresses ====================
+
+export interface CustomerAddressItem {
+  id: string;
+  label: 'HOME' | 'WORK' | 'OTHER' | string;
+  line1: string;
+  line2?: string;
+  landmark?: string;
+  lat: number;
+  lng: number;
+  isDefault: boolean;
+  createdAt: string;
+  area?: { id: string; name: string };
+}
+
+export function useAddresses() {
+  return useQuery({
+    queryKey: ['customer', 'addresses'],
+    queryFn: async (): Promise<CustomerAddressItem[]> => {
+      const res = await customerApi.get<CustomerAddressItem[]>('/addresses');
+      return res.data || [];
+    },
+  });
+}
+
+export function useCreateAddress() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      label?: string;
+      line1: string;
+      line2?: string;
+      landmark?: string;
+      lat: number;
+      lng: number;
+      isDefault?: boolean;
+    }) => {
+      const res = await customerApi.post('/addresses', payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['customer', 'addresses'] });
+    },
+  });
+}
+
+export function useDeleteAddress() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await customerApi.delete(`/addresses/${id}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['customer', 'addresses'] });
     },
   });
 }

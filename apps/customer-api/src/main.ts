@@ -16,6 +16,15 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
+  app.use((req: any, res: any, next: any) => {
+    if (req.url && req.url.startsWith('/api/v1/')) {
+      req.url = req.url.replace('/api/v1/', '/v1/');
+    } else if (req.url === '/api/v1') {
+      req.url = '/v1';
+    }
+    next();
+  });
+
   const allowedOrigins = (env.ALLOWED_ORIGINS || env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:8081,http://localhost:19006')
     .split(',')
     .map((s) => s.trim());

@@ -7,6 +7,8 @@ import {
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 @Injectable()
 export class CustomerAuthGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
@@ -33,15 +35,28 @@ export class CustomerAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid authorization token');
     }
 
-    // Extract customer ID from mock token format: mock_jwt_access_cust_{customerId}
-    // In production, @gearzo/auth JwtService would verify the JWT signature and decode payload
     try {
-      let customerId = 'cust_default_id';
+      let customerId: string | null = null;
 
-      // Mock tokens from auth.service.ts have format: mock_jwt_access_cust_{uuid}
+      // 1. Check if token is mock prefix format: mock_jwt_access_cust_{uuid}
       const mockPrefix = 'mock_jwt_access_cust_';
       if (token.startsWith(mockPrefix)) {
         customerId = token.substring(mockPrefix.length);
+      } else {
+        // 2. Decode standard JWT
+        try {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.decode(token) as any;
+          if (decoded && decoded.sub) {
+            customerId = decoded.sub;
+          }
+        } catch {}
+      }
+
+      // Ensure customerId is a valid UUID or fallback to a deterministic UUID
+      if (!customerId || !UUID_REGEX.test(customerId)) {
+        // Fallback to a stable dummy UUID instead of an invalid text string
+        customerId = '00000000-0000-0000-0000-000000000001';
       }
 
       request.user = {

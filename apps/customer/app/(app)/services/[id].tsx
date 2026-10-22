@@ -1,51 +1,38 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useServiceDetail } from '@gearzo/api-client';
 import { Card, Badge, Button, LoadingScreen, ErrorScreen } from '@gearzo/ui';
+import { useServiceDetail } from '@gearzo/api-client';
+import { useCartStore } from '../../../stores/cart-store';
 
 export default function ServiceDetailScreen() {
+  const { addItem } = useCartStore();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const { data: service, isLoading, isError, refetch } = useServiceDetail(id || '');
 
-  const fallbackService = {
-    id: id || 'srv-default',
-    name: 'Standard Periodic Service',
-    description:
-      'Engineered to restore peak motorcycle performance. Includes top-tier synthetic blend engine oil, filter maintenance, spark plug cleansing, and brake calibration.',
-    durationMinutes: 75,
-    basePricePaise: 119900,
-    includedFeatures: [
-      'Engine oil replacement (Up to 1.2L OEM grade)',
-      'Oil filter clean / replacement',
-      'Air filter cleaning & inspection',
-      'Spark plug cleaning and electrode gap setting',
-      'Front & rear brake pad cleaning & inspection',
-      'Drive chain cleaning, tightening & lubrication',
-      'Clutch & accelerator cable play adjustment',
-      'Full electrical battery, horn, headlamp check',
-      'Doorstep eco wash and tyre pressure check',
-    ],
-  };
-
-  const currentService = service || fallbackService;
-
   if (isLoading) {
     return <LoadingScreen message="Loading service information..." />;
   }
 
-  if (isError) {
-    return <ErrorScreen message="Failed to load service" onRetry={refetch} />;
+  if (isError || !service) {
+    return <ErrorScreen message="Failed to load service details." onRetry={refetch} />;
   }
+
+  const currentService = service;
+  const features: string[] =
+    (currentService as any).includedFeatures ||
+    (currentService as any).inclusions || [
+      'Engine & transmission multipoint diagnostic check',
+      'Fluid level verification and top-up',
+      'Brake pad wear & cable play calibration',
+      'Electrical systems, battery & headlamp test',
+      'Doorstep eco clean and tyre pressure check',
+    ];
+
+  const pricePaise = (currentService as any).pricePaise || currentService.basePricePaise || 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -66,18 +53,18 @@ export default function ServiceDetailScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <Badge label="GEARZO CERTIFIED" variant="success" />
             <Text style={{ fontSize: 13, color: '#6B7280' }}>
-              ⏱ Takes ~{currentService.durationMinutes} mins
+              ⏱ Takes ~{currentService.durationMinutes || 60} mins
             </Text>
           </View>
           <Text style={styles.title}>{currentService.name}</Text>
-          <Text style={styles.description}>{currentService.description}</Text>
+          <Text style={styles.description}>{currentService.description || 'Professional doorstep vehicle care.'}</Text>
         </View>
 
         {/* What's Included */}
         <Text style={styles.sectionHeader}>What's Included in this Package</Text>
         <Card variant="default" style={styles.checklistCard}>
           <View style={{ gap: 12 }}>
-            {currentService.includedFeatures?.map((feature, idx) => (
+            {features.map((feature, idx) => (
               <View key={idx} style={styles.featureRow}>
                 <View style={styles.checkIcon}>
                   <Text style={{ color: '#1B5E20', fontWeight: '800', fontSize: 12 }}>✓</Text>
@@ -115,7 +102,7 @@ export default function ServiceDetailScreen() {
         <View>
           <Text style={styles.bottomPriceLabel}>Total Amount</Text>
           <Text style={styles.bottomPrice}>
-            ₹{(currentService.basePricePaise / 100).toLocaleString('en-IN')}
+            ₹{(pricePaise / 100).toLocaleString('en-IN')}
           </Text>
         </View>
 
@@ -124,12 +111,16 @@ export default function ServiceDetailScreen() {
           variant="primary"
           size="lg"
           style={{ paddingHorizontal: 24 }}
-          onPress={() =>
-            router.push({
-              pathname: '/booking/checkout',
-              params: { serviceId: currentService.id },
-            })
-          }
+          onPress={() => {
+            addItem({
+              id: currentService.id,
+              name: currentService.name,
+              pricePaise: pricePaise,
+              durationMinutes: currentService.durationMinutes,
+              type: 'SERVICE',
+            });
+            router.push('/booking/checkout');
+          }}
         />
       </View>
     </SafeAreaView>
@@ -145,8 +136,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -154,8 +145,8 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 36,
     height: 36,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
@@ -166,7 +157,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     color: '#111827',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   description: {
     fontSize: 14,
@@ -186,38 +177,37 @@ const styles = StyleSheet.create({
   },
   featureRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   checkIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#DCFCE7',
-    alignItems: 'center',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#E8F5E9',
     justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 10,
-    marginTop: 2,
   },
   featureText: {
     fontSize: 14,
     color: '#374151',
     flex: 1,
-    lineHeight: 20,
   },
   guaranteeCard: {
     padding: 16,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    borderColor: '#C8E6C9',
+    backgroundColor: '#F1F8E9',
+    gap: 8,
   },
   guaranteeTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#111827',
+    color: '#1B5E20',
   },
   guaranteeSub: {
     fontSize: 12,
-    color: '#6B7280',
-    marginTop: 1,
+    color: '#33691E',
   },
   bottomBar: {
     position: 'absolute',
@@ -230,22 +220,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    alignItems: 'center',
   },
   bottomPriceLabel: {
     fontSize: 12,
     color: '#6B7280',
-    fontWeight: '500',
   },
   bottomPrice: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#1B5E20',
+    color: '#111827',
   },
 });

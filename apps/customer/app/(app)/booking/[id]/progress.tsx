@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,58 +9,57 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Badge, Button } from '@gearzo/ui';
+import { useBookingDetail } from '@gearzo/api-client';
+import { LoadingScreen, ErrorScreen } from '@gearzo/ui';
 
-interface ChecklistItem {
-  id: string;
-  title: string;
-  status: 'COMPLETED' | 'IN_PROGRESS' | 'PENDING';
-}
-
-export default function ServiceProgressScreen() {
+export default function ServiceInProgressScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { data: booking, isLoading, isError, refetch } = useBookingDetail(id || '');
 
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([
-    { id: '1', title: 'Vehicle 30-Point Inspection', status: 'COMPLETED' },
-    { id: '2', title: 'Engine Oil Flush & Refill', status: 'COMPLETED' },
-    { id: '3', title: 'Air & Fuel Filter Cleaning', status: 'IN_PROGRESS' },
-    { id: '4', title: 'Brake Caliper Servicing', status: 'PENDING' },
-    { id: '5', title: 'Chain Tension & Lube', status: 'PENDING' },
-    { id: '6', title: 'Final Road Test & Wash', status: 'PENDING' },
-  ]);
+  // Elapsed timer
+  const [secondsElapsed, setSecondsElapsed] = useState(0);
+  const [extraWorkStatus, setExtraWorkStatus] = useState<'PENDING' | 'APPROVED' | 'DECLINED'>('PENDING');
 
-  const [extraItem, setExtraItem] = useState<{
-    id: string;
-    partName: string;
-    pricePaise: number;
-    reason: string;
-    approved: boolean | null;
-  } | null>({
-    id: 'extra-1',
-    partName: 'Clutch Cable Assembly',
-    pricePaise: 38000,
-    reason: 'Heavy fraying detected near clutch lever. Risk of breakdown.',
-    approved: null,
-  });
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSecondsElapsed((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-  const handleApproveExtra = () => {
-    if (extraItem) {
-      setExtraItem({ ...extraItem, approved: true });
-      Alert.alert('Approved', 'Added to final invoice with 30-day parts warranty.');
-    }
+  if (isLoading) {
+    return <LoadingScreen message="Loading live service progress..." />;
+  }
+
+  if (isError || !booking) {
+    return <ErrorScreen message="Could not load booking progress." onRetry={refetch} />;
+  }
+
+  const bookingId = (booking as any)?.code || booking.id || id || '';
+  const mechanicObj = (booking as any).mechanic;
+  const mechanicName = mechanicObj?.name ? mechanicObj.name.split(' ')[0] : 'Mechanic';
+
+  const hours = Math.floor(secondsElapsed / 3600);
+  const minutes = Math.floor((secondsElapsed % 3600) / 60);
+  const seconds = secondsElapsed % 60;
+  const elapsedStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+  const checklist = [
+    { title: booking.serviceName || 'Engine diagnostic check', status: 'In progress', done: false },
+    { title: 'Fluid level verification & inspection', status: 'Pending', done: false },
+    { title: 'Electrical system & battery safety test', status: 'Pending', done: false },
+    { title: 'Brake wear & tyre pressure calibration', status: 'Pending', done: false },
+  ];
+
+  const handleApprove = () => {
+    setExtraWorkStatus('APPROVED');
+    Alert.alert('Extra Work Approved', '₹350 has been approved for Front Brake Pad Replacement. It has been added to your bill.');
   };
 
-  const handleDeclineExtra = () => {
-    if (extraItem) {
-      setExtraItem({ ...extraItem, approved: false });
-      Alert.alert('Declined', 'The extra repair request has been skipped.');
-    }
-  };
-
-  const handleFinishService = () => {
-    // Navigate to invoice
-    router.replace(`/booking/${id}/invoice`);
+  const handleDecline = () => {
+    setExtraWorkStatus('DECLINED');
+    Alert.alert('Extra Work Declined', 'The technician will proceed without replacing the front brake pads.');
   };
 
   return (
@@ -68,112 +67,97 @@ export default function ServiceProgressScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={{ fontSize: 22, color: '#111827' }}>←</Text>
+          <Text style={styles.backBtnText}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Live Service Progress</Text>
-        <Badge label="IN PROGRESS" variant="warning" />
+        <Text style={styles.headerTitle}>Booking ID {bookingId}</Text>
+        <View style={{ width: 32 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
-        {/* Status Banner */}
-        <Card variant="elevated" style={styles.statusCard}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ fontSize: 28, marginRight: 12 }}>⚙️</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.statusTitle}>Technician at Work</Text>
-              <Text style={styles.statusSub}>
-                Ramesh Kumar is actively executing service steps on your vehicle
-              </Text>
-            </View>
-          </View>
-        </Card>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
+        {/* Top Dark Green Card */}
+        <View style={styles.progressCard}>
+          <Text style={styles.progressSmall}>Service in progress</Text>
+          <Text style={styles.progressHeading}>{mechanicName} is working on your vehicle</Text>
+          <Text style={styles.progressSub}>
+            Elapsed {elapsedStr}
+          </Text>
+        </View>
 
-        {/* Extra Parts Approval Card (if any pending) */}
-        {extraItem && extraItem.approved === null && (
-          <Card variant="default" style={styles.approvalCard}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Badge label="ACTION REQUIRED" variant="error" />
-              <Text style={styles.extraPrice}>
-                +₹{(extraItem.pricePaise / 100).toLocaleString('en-IN')}
-              </Text>
-            </View>
-
-            <Text style={styles.extraTitle}>Additional Part Recommended</Text>
-            <Text style={styles.extraName}>{extraItem.partName}</Text>
-            <Text style={styles.extraReason}>{extraItem.reason}</Text>
-
-            <View style={styles.approvalBtnRow}>
-              <TouchableOpacity style={styles.declineBtn} onPress={handleDeclineExtra}>
-                <Text style={styles.declineText}>Decline</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.approveBtn} onPress={handleApproveExtra}>
-                <Text style={styles.approveText}>Approve & Replace</Text>
-              </TouchableOpacity>
-            </View>
-          </Card>
-        )}
-
-        {extraItem && extraItem.approved === true && (
-          <Card variant="default" style={[styles.approvalCard, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
-            <Text style={{ fontSize: 13, color: '#166534', fontWeight: '700' }}>
-              ✓ Approved Extra: {extraItem.partName} (+₹{(extraItem.pricePaise / 100).toLocaleString('en-IN')})
-            </Text>
-          </Card>
-        )}
-
-        {/* Live Service Checklist */}
-        <Text style={styles.sectionHeader}>Service Checklist</Text>
-        <Card variant="default" style={{ padding: 16, borderRadius: 12 }}>
-          <View style={{ gap: 14 }}>
-            {checklist.map((item, index) => {
-              const isDone = item.status === 'COMPLETED';
-              const isInProgress = item.status === 'IN_PROGRESS';
-              return (
-                <View key={item.id} style={styles.checkRow}>
-                  <View
-                    style={[
-                      styles.checkBadge,
-                      isDone && styles.checkBadgeDone,
-                      isInProgress && styles.checkBadgeActive,
-                    ]}
-                  >
-                    <Text style={styles.checkBadgeText}>
-                      {isDone ? '✓' : isInProgress ? '⏳' : `${index + 1}`}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[
-                        styles.checkTitle,
-                        isDone && { color: '#6B7280', textDecorationLine: 'line-through' },
-                      ]}
-                    >
-                      {item.title}
-                    </Text>
-                    <Text style={styles.checkSub}>
-                      {isDone
-                        ? 'Inspection complete & verified'
-                        : isInProgress
-                        ? 'Technician currently working'
-                        : 'Awaiting turn'}
-                    </Text>
-                  </View>
+        {/* SERVICE CHECKLIST */}
+        <Text style={styles.sectionTitle}>SERVICE CHECKLIST</Text>
+        <View style={styles.checklistCard}>
+          {checklist.map((item, index) => (
+            <View key={index}>
+              <View style={styles.checkRow}>
+                <View style={[styles.checkCircle, item.done ? styles.checkDone : styles.checkInProgress]}>
+                  <Text style={[styles.checkSign, item.done && { color: '#16A34A' }]}>
+                    {item.done ? '✓' : '○'}
+                  </Text>
                 </View>
-              );
-            })}
-          </View>
-        </Card>
+                <Text style={styles.checkTitle}>{item.title}</Text>
+                <Text
+                  style={[
+                    styles.checkStatusText,
+                    item.done ? { color: '#6B7280' } : { color: '#16A34A', fontWeight: '700' },
+                  ]}
+                >
+                  {item.status}
+                </Text>
+              </View>
+              {index < checklist.length - 1 && <View style={styles.divider} />}
+            </View>
+          ))}
+        </View>
 
-        {/* Simulation Button */}
-        <View style={{ marginTop: 24 }}>
-          <Button
-            title="Simulate Service Complete → View Invoice"
-            variant="primary"
-            size="lg"
-            onPress={handleFinishService}
-          />
+        {/* Amber Alert Card: Extra work found */}
+        <View style={styles.amberAlertCard}>
+          <Text style={styles.alertHeading}>Extra work found: approval needed</Text>
+          <Text style={styles.alertDesc}>
+            Front brake pads are worn out (3.2 mm left). Replacement is recommended for safe riding.
+          </Text>
+
+          {/* Item Row */}
+          <View style={styles.extraItemRow}>
+            <View style={styles.extraIconWrap}>
+              <Text style={{ fontSize: 18 }}>🔧</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.extraItemName}>Brake pad replacement</Text>
+              <Text style={styles.extraItemMeta}>Photo attached · 1 set</Text>
+            </View>
+            <Text style={styles.extraItemPrice}>₹350</Text>
+          </View>
+
+          {/* Actions */}
+          {extraWorkStatus === 'PENDING' ? (
+            <View style={styles.alertActionsRow}>
+              <TouchableOpacity style={styles.declineBtn} onPress={handleDecline}>
+                <Text style={styles.declineBtnText}>Decline</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.approveBtn} onPress={handleApprove}>
+                <Text style={styles.approveBtnText}>Approve ₹350</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={[styles.statusFeedbackPill, extraWorkStatus === 'APPROVED' ? styles.statusApproved : styles.statusDeclined]}>
+              <Text style={styles.statusFeedbackText}>
+                {extraWorkStatus === 'APPROVED' ? '✓ Approved (+₹350 added to invoice)' : '✕ Declined by customer'}
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
+
+      {/* Complete Service CTA Bar */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          style={styles.completeBtn}
+          onPress={() => router.push(`/booking/${bookingId}/invoice`)}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.completeBtnText}>Complete Service & View Bill ›</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -181,7 +165,7 @@ export default function ServiceProgressScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FAFAF9',
   },
   header: {
     flexDirection: 'row',
@@ -191,134 +175,217 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#F3F4F6',
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  backBtnText: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#0F1F16',
+    lineHeight: 28,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  statusCard: {
-    padding: 18,
-    borderRadius: 14,
-    marginBottom: 16,
-    backgroundColor: '#FFFFFF',
-  },
-  statusTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#111827',
+    color: '#0F1F16',
   },
-  statusSub: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  approvalCard: {
+  progressCard: {
+    backgroundColor: '#0B4A27',
+    borderRadius: 18,
     padding: 16,
-    borderRadius: 14,
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  extraPrice: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#B91C1C',
-  },
-  extraTitle: {
-    fontSize: 12,
-    color: '#7F1D1D',
+  progressSmall: {
+    color: '#A7F3D0',
+    fontSize: 11,
     fontWeight: '600',
-    marginTop: 8,
+    marginBottom: 2,
   },
-  extraName: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#111827',
-    marginTop: 2,
-  },
-  extraReason: {
-    fontSize: 13,
-    color: '#4B5563',
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  approvalBtnRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 14,
-  },
-  declineBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    alignItems: 'center',
-  },
-  declineText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#4B5563',
-  },
-  approveBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#1B5E20',
-    alignItems: 'center',
-  },
-  approveText: {
-    fontSize: 13,
-    fontWeight: '700',
+  progressHeading: {
     color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 4,
   },
-  sectionHeader: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 12,
+  progressSub: {
+    color: '#E5E7EB',
+    fontSize: 11.5,
+  },
+  sectionTitle: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#6B7280',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  checklistCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 20,
   },
   checkRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 10,
   },
-  checkBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F3F4F6',
+  checkCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
-  checkBadgeDone: {
+  checkDone: {
     backgroundColor: '#DCFCE7',
   },
-  checkBadgeActive: {
-    backgroundColor: '#FEF3C7',
+  checkInProgress: {
+    borderWidth: 1.5,
+    borderColor: '#16A34A',
   },
-  checkBadgeText: {
+  checkSign: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#374151',
+    fontWeight: '800',
   },
   checkTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#111827',
+    color: '#0F1F16',
+    flex: 1,
   },
-  checkSub: {
-    fontSize: 12,
+  checkStatusText: {
+    fontSize: 11.5,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+  },
+  amberAlertCard: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    padding: 16,
+  },
+  alertHeading: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  alertDesc: {
+    fontSize: 11,
+    color: '#78350F',
+    lineHeight: 16,
+    marginBottom: 14,
+  },
+  extraItemRow: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  extraIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  extraItemName: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#0F1F16',
+  },
+  extraItemMeta: {
+    fontSize: 10,
     color: '#6B7280',
     marginTop: 1,
+  },
+  extraItemPrice: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F1F16',
+  },
+  alertActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  declineBtn: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    borderRadius: 20,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  declineBtnText: {
+    color: '#374151',
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  approveBtn: {
+    flex: 1,
+    backgroundColor: '#16A34A',
+    borderRadius: 20,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  approveBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  statusFeedbackPill: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  statusApproved: {
+    backgroundColor: '#DCFCE7',
+  },
+  statusDeclined: {
+    backgroundColor: '#FEE2E2',
+  },
+  statusFeedbackText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#0F1F16',
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  completeBtn: {
+    width: '100%',
+    backgroundColor: '#16A34A',
+    borderRadius: 24,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  completeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

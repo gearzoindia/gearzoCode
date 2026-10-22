@@ -71,27 +71,56 @@ export class AuthService {
       isNewUser = true;
     }
 
+    // Determine profile completion state directly from database
+    const isProfileComplete = customer?.profileState === 'COMPLETED' || !!customer?.name;
+    const isNewUserCheck = isNewUser || (!isProfileComplete && !customer?.name);
+
+    const jwtSecret = env.JWT_SECRET || process.env.JWT_SECRET || 'cust-jwt-k3y-9f8a7b6c5d4e3f2a1b0c-minimum-32chars';
+    const jwt = require('jsonwebtoken');
+
+    const accessToken = jwt.sign(
+      {
+        sub: customer.id,
+        aud: 'customer',
+        role: 'customer',
+        phone: customer.phone || dto.phone,
+        tokenVersion: customer.tokenVersion || 0,
+      },
+      jwtSecret,
+      { expiresIn: '7d' }
+    );
+
+    const refreshToken = jwt.sign(
+      {
+        sub: customer.id,
+        aud: 'customer',
+        role: 'customer',
+        phone: customer.phone || dto.phone,
+        tokenVersion: customer.tokenVersion || 0,
+      },
+      jwtSecret,
+      { expiresIn: '30d' }
+    );
+
     const sessionId = 'sess_' + Math.random().toString(36).substring(2, 11);
-    const accessToken = 'mock_jwt_access_cust_' + (customer?.id || 'id');
-    const refreshToken = 'mock_jwt_refresh_cust_' + (customer?.id || 'id');
 
     return {
       accessToken,
       refreshToken,
-      expiresIn: 900,
+      expiresIn: 604800,
       tokens: {
         accessToken,
         refreshToken,
-        expiresIn: 900,
+        expiresIn: 604800,
       },
-      isNewUser,
+      isNewUser: isNewUserCheck,
       user: {
-        id: customer?.id,
-        phone: dto.phone,
+        id: customer.id,
+        phone: customer.phone || dto.phone,
         role: 'customer',
-        name: customer?.name ?? null,
-        email: customer?.email ?? null,
-        isProfileComplete: customer?.isProfileComplete ?? false,
+        name: customer.name ?? null,
+        email: customer.email ?? null,
+        isProfileComplete,
       },
       sessionId,
     };

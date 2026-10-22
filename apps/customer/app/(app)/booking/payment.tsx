@@ -9,43 +9,48 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Button, Badge } from '@gearzo/ui';
+import { useCartStore } from '../../../stores/cart-store';
 
-type PaymentMode = 'UPI_GPAY' | 'UPI_PHONEPE' | 'UPI_PAYTM' | 'CARD' | 'NET_BANKING' | 'PAY_LATER';
+type UpiOption = 'GPAY' | 'PHONEPE' | 'PAYTM' | 'NEW_UPI';
 
 export default function PaymentScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ bookingId: string; amountPaise: string }>();
+  const params = useLocalSearchParams<{ bookingId?: string; amountPaise?: string }>();
+  const { getFinalTotalPaise } = useCartStore();
 
-  const bookingId = params.bookingId || `gz-${Date.now()}`;
-  const amountPaise = parseInt(params.amountPaise || '123500', 10);
+  const bookingId = params.bookingId || '';
+  const amountPaise = params.amountPaise ? parseInt(params.amountPaise, 10) : getFinalTotalPaise();
+  const displayAmount = Math.round(amountPaise / 100);
 
-  const [selectedMode, setSelectedMode] = useState<PaymentMode>('UPI_GPAY');
+  const [selectedUpi, setSelectedUpi] = useState<UpiOption>('GPAY');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handlePay = () => {
     setIsProcessing(true);
-
-    // Simulate payment gateway delay (1.5 seconds)
     setTimeout(() => {
       setIsProcessing(false);
-      // Route to searching or confirmed
       router.replace({
         pathname: '/booking/confirmed',
-        params: { bookingId, amountPaise: amountPaise.toString() },
+        params: {
+          bookingId,
+          amountPaise: amountPaise.toString(),
+        },
       });
-    }, 1500);
+    }, 1200);
   };
 
-  const handleSimulateFailure = () => {
+  const handleSimulateFail = () => {
     setIsProcessing(true);
     setTimeout(() => {
       setIsProcessing(false);
       router.push({
         pathname: '/booking/payment-failed',
-        params: { bookingId, amountPaise: amountPaise.toString() },
+        params: {
+          bookingId,
+          amountPaise: amountPaise.toString(),
+        },
       });
-    }, 1000);
+    }, 800);
   };
 
   return (
@@ -53,139 +58,162 @@ export default function PaymentScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={{ fontSize: 22, color: '#111827' }}>←</Text>
+          <Text style={styles.backBtnText}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Select Payment Method</Text>
-        <View style={{ width: 36 }} />
+        <Text style={styles.headerTitle}>Payment</Text>
+        <TouchableOpacity onPress={handleSimulateFail} style={{ padding: 6 }}>
+          <Text style={{ fontSize: 11, color: '#9CA3AF', fontWeight: '600' }}>Simulate Fail</Text>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }}>
-        {/* Payable Header Card */}
-        <Card variant="elevated" style={styles.amountCard}>
-          <Text style={styles.amountLabel}>Total Payable Amount</Text>
-          <Text style={styles.amountValue}>
-            ₹{(amountPaise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </Text>
-          <Text style={styles.bookingRef}>Order #{bookingId.slice(0, 10).toUpperCase()}</Text>
-        </Card>
-
-        {/* UPI Section (Recommended) */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionHeader}>UPI (Recommended & Instant)</Text>
-          <Badge label="FASTEST" variant="success" />
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
+        {/* Top Dark Green Amount Payable Card */}
+        <View style={styles.amountCard}>
+          <View>
+            <Text style={styles.amountLabel}>Amount payable</Text>
+            <Text style={styles.amountValue}>₹{displayAmount}</Text>
+          </View>
+          <View style={styles.bookingIdPill}>
+            <Text style={styles.bookingIdText}>Booking ID {bookingId}</Text>
+          </View>
         </View>
 
-        <Card variant="default" style={styles.methodGroup}>
+        {/* UPI Section */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeading}>UPI</Text>
+          <View style={styles.recommendedBadge}>
+            <Text style={styles.recommendedText}>RECOMMENDED</Text>
+          </View>
+        </View>
+
+        <View style={styles.methodGroup}>
+          {/* Google Pay */}
           <TouchableOpacity
-            style={[styles.methodRow, selectedMode === 'UPI_GPAY' && styles.methodRowActive]}
-            onPress={() => setSelectedMode('UPI_GPAY')}
+            style={styles.methodRow}
+            onPress={() => setSelectedUpi('GPAY')}
+            activeOpacity={0.8}
           >
-            <Text style={{ fontSize: 26, marginRight: 12 }}>⚡</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.methodTitle}>Google Pay</Text>
-              <Text style={styles.methodSub}>Pay directly with UPI linked account</Text>
+            <View style={[styles.upiIconBox, { backgroundColor: '#2563EB' }]}>
+              <Text style={styles.upiIconText}>G</Text>
             </View>
-            <View style={[styles.radio, selectedMode === 'UPI_GPAY' && styles.radioActive]} />
+            <Text style={styles.methodName}>Google Pay</Text>
+            <View style={[styles.radioOuter, selectedUpi === 'GPAY' && styles.radioOuterSelected]}>
+              {selectedUpi === 'GPAY' && <View style={styles.radioInner} />}
+            </View>
           </TouchableOpacity>
 
           <View style={styles.divider} />
 
+          {/* PhonePe */}
           <TouchableOpacity
-            style={[styles.methodRow, selectedMode === 'UPI_PHONEPE' && styles.methodRowActive]}
-            onPress={() => setSelectedMode('UPI_PHONEPE')}
+            style={styles.methodRow}
+            onPress={() => setSelectedUpi('PHONEPE')}
+            activeOpacity={0.8}
           >
-            <Text style={{ fontSize: 26, marginRight: 12 }}>🟣</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.methodTitle}>PhonePe</Text>
-              <Text style={styles.methodSub}>Instant UPI app payment</Text>
+            <View style={[styles.upiIconBox, { backgroundColor: '#5B21B6', borderRadius: 16 }]}>
+              <Text style={styles.upiIconText}>Pe</Text>
             </View>
-            <View style={[styles.radio, selectedMode === 'UPI_PHONEPE' && styles.radioActive]} />
+            <Text style={styles.methodName}>PhonePe</Text>
+            <View style={[styles.radioOuter, selectedUpi === 'PHONEPE' && styles.radioOuterSelected]}>
+              {selectedUpi === 'PHONEPE' && <View style={styles.radioInner} />}
+            </View>
           </TouchableOpacity>
 
           <View style={styles.divider} />
 
+          {/* Paytm */}
           <TouchableOpacity
-            style={[styles.methodRow, selectedMode === 'UPI_PAYTM' && styles.methodRowActive]}
-            onPress={() => setSelectedMode('UPI_PAYTM')}
+            style={styles.methodRow}
+            onPress={() => setSelectedUpi('PAYTM')}
+            activeOpacity={0.8}
           >
-            <Text style={{ fontSize: 26, marginRight: 12 }}>🔷</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.methodTitle}>Paytm UPI</Text>
-              <Text style={styles.methodSub}>Pay using Paytm wallet or linked UPI</Text>
+            <View style={[styles.upiIconBox, { backgroundColor: '#0284C7', borderRadius: 16 }]}>
+              <Text style={styles.upiIconText}>Pt</Text>
             </View>
-            <View style={[styles.radio, selectedMode === 'UPI_PAYTM' && styles.radioActive]} />
-          </TouchableOpacity>
-        </Card>
-
-        {/* Cards & Banking */}
-        <Text style={styles.sectionHeader}>Cards & Net Banking</Text>
-        <Card variant="default" style={styles.methodGroup}>
-          <TouchableOpacity
-            style={[styles.methodRow, selectedMode === 'CARD' && styles.methodRowActive]}
-            onPress={() => setSelectedMode('CARD')}
-          >
-            <Text style={{ fontSize: 26, marginRight: 12 }}>💳</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.methodTitle}>Credit / Debit Card</Text>
-              <Text style={styles.methodSub}>Visa, MasterCard, RuPay, Maestro</Text>
+            <Text style={styles.methodName}>Paytm</Text>
+            <View style={[styles.radioOuter, selectedUpi === 'PAYTM' && styles.radioOuterSelected]}>
+              {selectedUpi === 'PAYTM' && <View style={styles.radioInner} />}
             </View>
-            <View style={[styles.radio, selectedMode === 'CARD' && styles.radioActive]} />
           </TouchableOpacity>
 
           <View style={styles.divider} />
 
+          {/* Add new UPI ID */}
           <TouchableOpacity
-            style={[styles.methodRow, selectedMode === 'NET_BANKING' && styles.methodRowActive]}
-            onPress={() => setSelectedMode('NET_BANKING')}
+            style={styles.methodRow}
+            onPress={() => setSelectedUpi('NEW_UPI')}
+            activeOpacity={0.8}
           >
-            <Text style={{ fontSize: 26, marginRight: 12 }}>🏦</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.methodTitle}>Net Banking</Text>
-              <Text style={styles.methodSub}>HDFC, SBI, ICICI, Axis & 50+ banks</Text>
+            <View style={[styles.upiIconBox, { backgroundColor: '#E3F6EA' }]}>
+              <Text style={{ fontSize: 16, color: '#16A34A', fontWeight: '800' }}>+</Text>
             </View>
-            <View style={[styles.radio, selectedMode === 'NET_BANKING' && styles.radioActive]} />
-          </TouchableOpacity>
-        </Card>
-
-        {/* Pay After Service */}
-        <Text style={styles.sectionHeader}>Pay on Delivery</Text>
-        <Card variant="default" style={styles.methodGroup}>
-          <TouchableOpacity
-            style={[styles.methodRow, selectedMode === 'PAY_LATER' && styles.methodRowActive]}
-            onPress={() => setSelectedMode('PAY_LATER')}
-          >
-            <Text style={{ fontSize: 26, marginRight: 12 }}>💵</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.methodTitle}>Pay After Service Completion</Text>
-              <Text style={styles.methodSub}>
-                Pay cash or UPI directly to technician once work is finished
-              </Text>
+              <Text style={styles.methodName}>Add new UPI ID</Text>
+              <Text style={styles.methodSub}>name@bank</Text>
             </View>
-            <View style={[styles.radio, selectedMode === 'PAY_LATER' && styles.radioActive]} />
+            <View style={[styles.radioOuter, selectedUpi === 'NEW_UPI' && styles.radioOuterSelected]}>
+              {selectedUpi === 'NEW_UPI' && <View style={styles.radioInner} />}
+            </View>
           </TouchableOpacity>
-        </Card>
+        </View>
 
-        {/* Test failure simulator for edge-case UX */}
-        <TouchableOpacity
-          style={styles.simulateFailLink}
-          onPress={handleSimulateFailure}
-        >
-          <Text style={{ fontSize: 12, color: '#9CA3AF', textDecorationLine: 'underline' }}>
-            Simulate Gateway Failure (Test UX)
-          </Text>
-        </TouchableOpacity>
+        {/* MORE WAYS TO PAY Section */}
+        <Text style={[styles.sectionHeading, { marginTop: 22, marginBottom: 10 }]}>
+          MORE WAYS TO PAY
+        </Text>
+
+        <View style={styles.methodGroup}>
+          {/* Credit / Debit Card */}
+          <TouchableOpacity style={styles.methodRow} activeOpacity={0.8} onPress={handlePay}>
+            <View style={[styles.upiIconBox, { backgroundColor: '#1E293B' }]}>
+              <Text style={{ fontSize: 16 }}>💳</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.methodName}>Credit / Debit Card</Text>
+              <Text style={styles.methodSub}>Visa, Mastercard, RuPay</Text>
+            </View>
+            <Text style={styles.arrowIcon}>›</Text>
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          {/* Net Banking */}
+          <TouchableOpacity style={styles.methodRow} activeOpacity={0.8} onPress={handlePay}>
+            <View style={[styles.upiIconBox, { backgroundColor: '#1E293B' }]}>
+              <Text style={{ fontSize: 16 }}>🏦</Text>
+            </View>
+            <Text style={[styles.methodName, { flex: 1 }]}>Net Banking</Text>
+            <Text style={styles.arrowIcon}>›</Text>
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          {/* Wallets */}
+          <TouchableOpacity style={styles.methodRow} activeOpacity={0.8} onPress={handlePay}>
+            <View style={[styles.upiIconBox, { backgroundColor: '#1E293B' }]}>
+              <Text style={{ fontSize: 16 }}>👛</Text>
+            </View>
+            <Text style={[styles.methodName, { flex: 1 }]}>Wallets</Text>
+            <Text style={styles.arrowIcon}>›</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
-      {/* Pay CTA */}
+      {/* Sticky Bottom Bar */}
       <View style={styles.bottomBar}>
-        <Button
-          title={isProcessing ? 'Processing Payment...' : `Pay ₹${(amountPaise / 100).toLocaleString('en-IN')}`}
-          variant="primary"
-          size="lg"
-          loading={isProcessing}
-          disabled={isProcessing}
+        <TouchableOpacity
+          style={styles.payBtn}
           onPress={handlePay}
-        />
+          disabled={isProcessing}
+          activeOpacity={0.9}
+        >
+          {isProcessing ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.payBtnText}>Pay ₹{displayAmount}</Text>
+          )}
+        </TouchableOpacity>
+        <Text style={styles.secureText}>🛡️ 100% secure payments</Text>
       </View>
     </SafeAreaView>
   );
@@ -194,7 +222,7 @@ export default function PaymentScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FAFAF9',
   },
   header: {
     flexDirection: 'row',
@@ -204,98 +232,140 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#F3F4F6',
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  backBtnText: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#0F1F16',
+    lineHeight: 28,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: '800',
+    color: '#0F1F16',
   },
   amountCard: {
-    padding: 20,
-    borderRadius: 14,
+    backgroundColor: '#0B4A27',
+    borderRadius: 18,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-    backgroundColor: '#FFFFFF',
   },
   amountLabel: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
+    fontSize: 11,
+    color: '#A7F3D0',
+    fontWeight: '600',
+    marginBottom: 2,
   },
   amountValue: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '800',
-    color: '#1B5E20',
-    marginVertical: 4,
+    color: '#FFFFFF',
   },
-  bookingRef: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    letterSpacing: 0.5,
+  bookingIdPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  bookingIdText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    gap: 8,
+    marginBottom: 10,
   },
-  sectionHeader: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#374151',
-    marginTop: 14,
-    marginBottom: 8,
+  sectionHeading: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#6B7280',
+    letterSpacing: 0.5,
+  },
+  recommendedBadge: {
+    backgroundColor: '#0F4A24',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  recommendedText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   methodGroup: {
-    padding: 0,
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     overflow: 'hidden',
-    marginBottom: 10,
   },
   methodRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
-  methodRowActive: {
-    backgroundColor: '#F0FDF4',
+  upiIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  methodTitle: {
-    fontSize: 15,
+  upiIconText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  methodName: {
+    fontSize: 13.5,
     fontWeight: '700',
-    color: '#111827',
+    color: '#0F1F16',
+    flex: 1,
   },
   methodSub: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 2,
+    fontSize: 10.5,
+    color: '#9CA3AF',
+    marginTop: 1,
   },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+  radioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: '#D1D5DB',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  radioActive: {
-    borderColor: '#1B5E20',
-    backgroundColor: '#1B5E20',
+  radioOuterSelected: {
+    borderColor: '#16A34A',
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#16A34A',
+  },
+  arrowIcon: {
+    fontSize: 18,
+    color: '#9CA3AF',
   },
   divider: {
     height: 1,
     backgroundColor: '#F3F4F6',
-    marginLeft: 54,
-  },
-  simulateFailLink: {
-    alignItems: 'center',
-    marginVertical: 16,
+    marginHorizontal: 14,
   },
   bottomBar: {
     position: 'absolute',
@@ -303,9 +373,30 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingHorizontal: 20,
+    borderTopColor: '#F3F4F6',
+    alignItems: 'center',
+  },
+  payBtn: {
+    width: '100%',
+    backgroundColor: '#16A34A',
+    borderRadius: 24,
     paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  payBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  secureText: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '600',
   },
 });

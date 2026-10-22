@@ -11,7 +11,6 @@ import {
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@gearzo/api-client';
-import { Avatar, Card, Badge } from '@gearzo/ui';
 
 export default function ProfileTab() {
   const router = useRouter();
@@ -39,264 +38,265 @@ export default function ProfileTab() {
     }
   };
 
-  const maskedPhone = user?.phone
-    ? user.phone.slice(0, 5) + '••••' + user.phone.slice(-3)
-    : '+91 ••••• •••••';
+  const displayName = user?.name || user?.phone || 'Customer';
+  const initial = displayName.charAt(0).toUpperCase();
+  const phoneStr = user?.phone || '';
+  const maskedPhone = phoneStr
+    ? phoneStr.length > 6
+      ? phoneStr.slice(0, 4) + ' •••• ' + phoneStr.slice(-2)
+      : phoneStr
+    : 'No phone registered';
+  const email = user?.email || 'No email registered';
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-        {/* Header User Card */}
-        <View style={styles.userHeader}>
-          <Avatar name={user?.name || 'Customer'} size="lg" />
-          <View style={{ marginLeft: 16, flex: 1 }}>
-            <Text style={styles.userName}>{user?.name || 'GearZo Driver'}</Text>
-            <Text style={styles.userPhone}>{maskedPhone}</Text>
-            {user?.email ? <Text style={styles.userEmail}>{user.email}</Text> : null}
-          </View>
-          <TouchableOpacity
-            style={styles.editProfileBtn}
-            onPress={() => router.push('/profile/edit')}
-            accessibilityRole="button"
-            accessibilityLabel="Edit profile"
-          >
-            <Text style={{ fontSize: 16 }}>✏️</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Quick Tiles */}
-        <View style={styles.quickTilesRow}>
-          <TouchableOpacity
-            style={styles.quickTile}
-            onPress={() => router.push('/addresses')}
-            accessibilityRole="button"
-          >
-            <Text style={styles.quickTileIcon}>📍</Text>
-            <Text style={styles.quickTileTitle}>Saved Addresses</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickTile}
-            onPress={() => router.push('/profile/upcoming')}
-            accessibilityRole="button"
-          >
-            <Text style={styles.quickTileIcon}>⏱️</Text>
-            <Text style={styles.quickTileTitle}>Upcoming Services</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.quickTile, { opacity: 0.85 }]}
-            onPress={() => router.push('/profile/rewards')}
-            accessibilityRole="button"
-          >
-            <View style={styles.soonBadge}>
-              <Badge label="Soon" variant="neutral" />
+    <View style={styles.container}>
+      {/* Top Dark Green Curved Header */}
+      <View style={styles.curvedHeader}>
+        <SafeAreaView edges={['top', 'left', 'right']}>
+          <View style={styles.userRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.userName}>{displayName}</Text>
+              <Text style={styles.userPhone}>{maskedPhone}</Text>
+              <Text style={styles.userEmail}>{email}</Text>
             </View>
-            <Text style={styles.quickTileIcon}>🎁</Text>
-            <Text style={styles.quickTileTitle}>Rewards & Cash</Text>
+            <View style={styles.avatarSquircle}>
+              <Text style={styles.avatarText}>{initial}</Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
+        {/* 3 Quick Cards */}
+        <View style={styles.quickCardsRow}>
+          {/* Saved Address */}
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/addresses')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.quickCardIcon}>📍</Text>
+            <Text style={styles.quickCardTitle}>Saved{'\n'}Address</Text>
+          </TouchableOpacity>
+
+          {/* Upcoming Services */}
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/profile/upcoming')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.quickCardIcon}>📅</Text>
+            <Text style={styles.quickCardTitle}>Upcoming{'\n'}Services</Text>
+          </TouchableOpacity>
+
+          {/* Your Rewards */}
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/profile/rewards')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.comingSoonTag}>
+              <Text style={styles.comingSoonText}>Coming Soon</Text>
+            </View>
+            <Text style={styles.quickCardIcon}>🎁</Text>
+            <Text style={styles.quickCardTitle}>Your{'\n'}Rewards</Text>
           </TouchableOpacity>
         </View>
 
         {/* Menu Items */}
-        <View style={{ paddingHorizontal: 20 }}>
-          <Text style={styles.sectionHeader}>Account & Preferences</Text>
-          <Card variant="default" style={styles.menuCard}>
-            <TouchableOpacity
-              style={styles.menuRow}
-              onPress={() => router.push('/profile/order-history')}
-            >
-              <Text style={styles.menuIcon}>📜</Text>
-              <Text style={styles.menuText}>Order History</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-
-            <TouchableOpacity
-              style={styles.menuRow}
-              onPress={() => router.push('/profile/edit')}
-            >
-              <Text style={styles.menuIcon}>👤</Text>
-              <Text style={styles.menuText}>Personal Details</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-
-            <TouchableOpacity
-              style={styles.menuRow}
-              onPress={() => router.push('/profile/settings')}
-            >
-              <Text style={styles.menuIcon}>⚙️</Text>
-              <Text style={styles.menuText}>App Settings & Notifications</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </TouchableOpacity>
-          </Card>
-
-          <Text style={styles.sectionHeader}>Support & Legal</Text>
-          <Card variant="default" style={styles.menuCard}>
-            <TouchableOpacity
-              style={styles.menuRow}
-              onPress={() => router.push('/profile/help')}
-            >
-              <Text style={styles.menuIcon}>💬</Text>
-              <Text style={styles.menuText}>Help & Support</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </TouchableOpacity>
-
-            <View style={styles.menuDivider} />
-
-            <TouchableOpacity
-              style={styles.menuRow}
-              onPress={() => router.push('/profile/legal')}
-            >
-              <Text style={styles.menuIcon}>📄</Text>
-              <Text style={styles.menuText}>Terms of Service & Privacy</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </TouchableOpacity>
-          </Card>
-
-          {/* Logout Button */}
+        <View style={styles.menuGroup}>
+          {/* Order History */}
           <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={handleLogout}
-            accessibilityRole="button"
-            accessibilityLabel="Log out of account"
+            style={styles.menuItem}
+            onPress={() => router.push('/(app)/(tabs)/bookings')}
+            activeOpacity={0.8}
           >
-            <Text style={styles.logoutText}>Log Out</Text>
+            <Text style={styles.menuIcon}>📄</Text>
+            <Text style={styles.menuLabel}>Order History</Text>
+            <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
-          <Text style={styles.versionText}>GearZo Customer App v1.0.0 (Expo SDK 52)</Text>
+          {/* Settings */}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push('/profile/settings')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.menuIcon}>⚙️</Text>
+            <Text style={styles.menuLabel}>Settings</Text>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
+          {/* Terms & Privacy */}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push('/profile/legal')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.menuIcon}>📑</Text>
+            <Text style={styles.menuLabel}>Terms & Privacy</Text>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
+          {/* Help */}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push('/profile/help')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.menuIcon}>ℹ️</Text>
+            <Text style={styles.menuLabel}>Help</Text>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+
+          {/* Logout */}
+          <TouchableOpacity
+            style={[styles.menuItem, styles.logoutItem]}
+            onPress={handleLogout}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.menuIcon}>🚪</Text>
+            <Text style={styles.logoutLabel}>Logout</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FAFAF9',
   },
-  userHeader: {
+  curvedHeader: {
+    backgroundColor: '#0B4A27',
+    paddingBottom: 28,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  userRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    marginTop: 10,
   },
   userName: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#111827',
+    color: '#FFFFFF',
+    marginBottom: 4,
   },
   userPhone: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 2,
+    fontSize: 12,
+    color: '#D1FAE5',
+    fontWeight: '500',
+    marginBottom: 2,
   },
   userEmail: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 2,
+    fontSize: 11.5,
+    color: '#A7F3D0',
+    fontWeight: '500',
   },
-  editProfileBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F3F4F6',
+  avatarSquircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 4,
   },
-  quickTilesRow: {
+  avatarText: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#0B4A27',
+  },
+  quickCardsRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
     gap: 12,
+    marginBottom: 16,
   },
-  quickTile: {
+  quickCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    borderRadius: 18,
     padding: 14,
-    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    height: 106,
+    justifyContent: 'space-between',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  comingSoonTag: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 8,
+  },
+  comingSoonText: {
+    fontSize: 7.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  quickCardIcon: {
+    fontSize: 20,
+  },
+  quickCardTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F1F16',
+    lineHeight: 16,
+  },
+  menuGroup: {
+    gap: 10,
+  },
+  menuItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    position: 'relative',
-  },
-  quickTileIcon: {
-    fontSize: 24,
-    marginBottom: 6,
-  },
-  quickTileTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-    textAlign: 'center',
-  },
-  soonBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-  },
-  sectionHeader: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  menuCard: {
-    padding: 0,
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  menuRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
   },
   menuIcon: {
     fontSize: 18,
-    marginRight: 12,
+    marginRight: 14,
   },
-  menuText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#1F2937',
+  menuLabel: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0F1F16',
     flex: 1,
   },
-  menuArrow: {
-    fontSize: 20,
+  chevron: {
+    fontSize: 18,
     color: '#9CA3AF',
   },
-  menuDivider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginLeft: 46,
+  logoutItem: {
+    marginTop: 4,
   },
-  logoutButton: {
-    marginTop: 24,
-    paddingVertical: 14,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  logoutText: {
-    color: '#DC2626',
+  logoutLabel: {
+    fontSize: 13.5,
     fontWeight: '700',
-    fontSize: 15,
-  },
-  versionText: {
-    textAlign: 'center',
-    color: '#9CA3AF',
-    fontSize: 12,
-    marginTop: 18,
-    marginBottom: 8,
+    color: '#DC2626',
+    flex: 1,
   },
 });

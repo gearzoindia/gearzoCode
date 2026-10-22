@@ -126,6 +126,7 @@ export interface ServiceItem {
   description: string;
   durationMinutes: number;
   basePricePaise: number;
+  pricePaise?: number;
   vehicleTypes: VehicleType[];
   includedFeatures: string[];
   recommendedIntervalKm?: number;

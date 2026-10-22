@@ -4,330 +4,375 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  RefreshControl,
   StyleSheet,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSubscriptions, useVehicles } from '@gearzo/api-client';
-import { Card, Badge, Button, LoadingScreen, ErrorScreen, EmptyState } from '@gearzo/ui';
+import { LoadingScreen } from '@gearzo/ui';
 
-type SubTab = 'ALL' | 'MY_PLANS';
+type SubTab = 'ALL' | 'MY_SUB';
 
 export default function SubscriptionTab() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<SubTab>('ALL');
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('all');
-
-  const { data: plans, isLoading, isError, refetch, isRefetching } = useSubscriptions();
+  const { data: serverPlans, isLoading, refetch, isRefetching } = useSubscriptions();
   const { data: vehicles } = useVehicles();
 
-  const mockPlans = plans || [
-    {
-      id: 'sub-annual-pro',
-      title: 'GearZo Care Pass Pro',
-      tagline: 'Complete peace of mind for daily drivers',
-      pricePaise: 299900,
-      validityDays: 365,
-      badge: 'Save ₹4,500/yr',
-      benefits: [
-        '3 Comprehensive Periodic Services / year',
-        'Unlimited Roadside Assistance & Battery Jumpstarts',
-        'Zero Labour Charge on Emergency Breakdowns',
-        'Free 30-Point Monsoon & Winter Inspections',
-        'Priority Mechanic Dispatch under 20 mins',
-      ],
-    },
-    {
-      id: 'sub-semi-annual',
-      title: 'GearZo Essential Rider',
-      tagline: 'Perfect for two-wheeler city commuters',
-      pricePaise: 129900,
-      validityDays: 180,
-      badge: 'Popular',
-      benefits: [
-        '2 Periodic Maintenance Services',
-        '2 Free Emergency Breakdown Calls',
-        'Complimentary Chain Lube & Wash',
-        '10% Flat Discount on OEM Spare Parts',
-      ],
-    },
-  ];
+  const vehicleList = Array.isArray(vehicles) ? vehicles : [];
+  const primaryVehicle = vehicleList.find((v) => v.isDefault) || vehicleList[0] || null;
+
+  const plans = (Array.isArray(serverPlans) ? serverPlans : []).map((p, idx) => ({
+    id: p.id,
+    vehicleType: (p as any).vehicleType === 'FOUR_WHEELER' ? '4-Wheeler' : '2-Wheeler',
+    title: p.title || (p as any).name || 'Care Plan',
+    badge: p.badge || (p as any).badge || 'Annual Care',
+    validity: p.validityDays ? `${Math.round(p.validityDays / 30)} Months` : '1 Year',
+    benefit: p.tagline || (p as any).description || (Array.isArray(p.benefits) ? p.benefits[0] : 'Free periodic checkups & priority technician dispatch'),
+    price: `₹${Math.round(p.pricePaise / 100)}`,
+    period: '/year',
+    bgColor: idx % 2 === 0 ? '#0B4A27' : '#1E293B',
+  }));
 
   if (isLoading && !isRefetching) {
-    return <LoadingScreen message="Loading GearZo subscription plans..." />;
-  }
-
-  if (isError) {
-    return <ErrorScreen message="Failed to load subscription plans." onRetry={refetch} />;
+    return <LoadingScreen message="Loading subscription plans..." />;
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>GearZo Pass</Text>
-        <Text style={styles.subtitle}>
-          Save up to 40% on annual vehicle maintenance with zero surprise charges.
-        </Text>
+    <View style={styles.container}>
+      {/* Top Dark Green Curved Header */}
+      <View style={styles.curvedHeader}>
+        <SafeAreaView edges={['top', 'left', 'right']}>
+          <Text style={styles.headerTitle}>Subscription Plans</Text>
+
+          {/* Vehicle Dropdown Pill */}
+          <TouchableOpacity
+            style={styles.vehicleDropdownPill}
+            onPress={() => Alert.alert('Select Vehicle', 'Filtering plans for all vehicles.')}
+          >
+            <Text style={{ fontSize: 13, marginRight: 6 }}>🚗</Text>
+            <Text style={styles.vehicleDropdownText}>All Vehicles</Text>
+            <Text style={styles.dropdownCaret}>▼</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
       </View>
 
-      {/* Segmented Control */}
-      <View style={styles.tabBar}>
+      {/* Segmented Control: All Subscription vs My Subscription */}
+      <View style={styles.segmentedControl}>
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'ALL' && styles.tabButtonActive]}
+          style={[styles.segmentBtn, activeTab === 'ALL' && styles.segmentBtnActive]}
           onPress={() => setActiveTab('ALL')}
-          accessibilityRole="button"
         >
-          <Text style={[styles.tabText, activeTab === 'ALL' && styles.tabTextActive]}>
-            All Subscriptions
+          <Text style={[styles.segmentText, activeTab === 'ALL' && styles.segmentTextActive]}>
+            All Subscription
           </Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'MY_PLANS' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('MY_PLANS')}
-          accessibilityRole="button"
+          style={[styles.segmentBtn, activeTab === 'MY_SUB' && styles.segmentBtnActive]}
+          onPress={() => setActiveTab('MY_SUB')}
         >
-          <Text style={[styles.tabText, activeTab === 'MY_PLANS' && styles.tabTextActive]}>
-            My Subscription (0)
+          <Text style={[styles.segmentText, activeTab === 'MY_SUB' && styles.segmentTextActive]}>
+            My Subscription
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Vehicle Filter Selector */}
-      {vehicles && vehicles.length > 0 && (
-        <View style={styles.vehicleFilterBar}>
-          <Text style={styles.filterLabel}>Vehicle:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            <TouchableOpacity
-              style={[styles.chip, selectedVehicleId === 'all' && styles.chipActive]}
-              onPress={() => setSelectedVehicleId('all')}
-            >
-              <Text style={[styles.chipText, selectedVehicleId === 'all' && styles.chipTextActive]}>
-                All Vehicles
-              </Text>
-            </TouchableOpacity>
-            {vehicles.map((v) => (
-              <TouchableOpacity
-                key={v.id}
-                style={[styles.chip, selectedVehicleId === v.id && styles.chipActive]}
-                onPress={() => setSelectedVehicleId(v.id)}
-              >
-                <Text style={[styles.chipText, selectedVehicleId === v.id && styles.chipTextActive]}>
-                  {v.brand} {v.model}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Main Content */}
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-        refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#1B5E20" />
-        }
+        contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#16A34A" />}
       >
-        {activeTab === 'MY_PLANS' ? (
-          <EmptyState
-            title="No Active Subscriptions"
-            description="You don't have an active maintenance pass yet. Choose a plan to unlock free services and emergency roadside coverage!"
-            buttonTitle="Browse Plans"
-            onAction={() => setActiveTab('ALL')}
-          />
+        {activeTab === 'MY_SUB' ? (
+          <View style={styles.emptyMySub}>
+            <Text style={{ fontSize: 32, marginBottom: 8 }}>🛡️</Text>
+            <Text style={styles.emptyMySubTitle}>No Active Subscription</Text>
+            <Text style={styles.emptyMySubDesc}>
+              Protect your bike and save up to ₹3,000 every year with a GearZo Care Pass.
+            </Text>
+            <TouchableOpacity
+              style={styles.browsePlansBtn}
+              onPress={() => setActiveTab('ALL')}
+            >
+              <Text style={styles.browsePlansText}>Explore Plans</Text>
+            </TouchableOpacity>
+          </View>
+        ) : plans.length === 0 ? (
+          <View style={styles.emptyMySub}>
+            <Text style={{ fontSize: 32, marginBottom: 8 }}>🛡️</Text>
+            <Text style={styles.emptyMySubTitle}>No Subscription Plans Available</Text>
+            <Text style={styles.emptyMySubDesc}>
+              There are no active plans in the catalogue right now. Please check back later.
+            </Text>
+          </View>
         ) : (
           <View style={{ gap: 16 }}>
-            {mockPlans.map((plan) => (
-              <Card key={plan.id} variant="elevated" style={styles.planCard}>
-                <View style={styles.planHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.planTitle}>{plan.title}</Text>
-                    <Text style={styles.planTagline}>{plan.tagline}</Text>
-                  </View>
-                  {plan.badge && <Badge label={plan.badge} variant="warning" />}
-                </View>
-
-                <View style={styles.priceRow}>
-                  <Text style={styles.planPrice}>
-                    ₹{(plan.pricePaise / 100).toLocaleString('en-IN')}
-                  </Text>
-                  <Text style={styles.planDuration}>/ {plan.validityDays} Days</Text>
-                </View>
-
-                <View style={styles.divider} />
-
-                {/* Benefits List */}
-                <View style={{ gap: 8, marginBottom: 16 }}>
-                  {plan.benefits.map((b, i) => (
-                    <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                      <Text style={{ fontSize: 14, color: '#1B5E20', marginRight: 8 }}>✓</Text>
-                      <Text style={{ fontSize: 13, color: '#374151', flex: 1, lineHeight: 18 }}>
-                        {b}
-                      </Text>
+            {plans.map((p) => (
+              <View key={p.id} style={styles.planCard}>
+                {/* Dark Banner Top Half */}
+                <View style={[styles.planCardHeader, { backgroundColor: p.bgColor }]}>
+                  <View style={styles.planHeaderTopRow}>
+                    <Text style={styles.vehicleTypeText}>🏍️ {p.vehicleType}</Text>
+                    <View style={styles.validityBadge}>
+                      <Text style={styles.validityLabel}>Validity</Text>
+                      <Text style={styles.validityBold}>{p.validity}</Text>
                     </View>
-                  ))}
-                </View>
+                  </View>
 
-                {/* Subscribe Button with Coming Soon ribbon */}
-                <View style={{ position: 'relative' }}>
-                  <Button
-                    title="Subscribe Now"
-                    variant="primary"
-                    size="md"
-                    onPress={() => router.push(`/subscription/${plan.id}`)}
-                  />
-                  <View style={styles.comingSoonRibbon}>
-                    <Text style={styles.comingSoonText}>COMING SOON</Text>
+                  <View style={styles.planHeroRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.planTitle}>{p.title}</Text>
+                      <View style={styles.benefitPill}>
+                        <Text style={styles.benefitPillText}>{p.benefit}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.mechanicVisual}>
+                      <Text style={{ fontSize: 44 }}>👨‍🔧</Text>
+                    </View>
                   </View>
                 </View>
-              </Card>
+
+                {/* Light Footer Row */}
+                <View style={styles.planCardFooter}>
+                  <View>
+                    <Text style={styles.startingLabel}>Starting from</Text>
+                    <Text style={styles.priceRow}>
+                      <Text style={styles.priceAmount}>{p.price}</Text>
+                      <Text style={styles.periodText}>{p.period}</Text>
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.detailsBtn}
+                    onPress={() =>
+                      Alert.alert(
+                        p.title,
+                        `Includes ${p.benefit}, priority roadside dispatch, and flat discounts on consumables. Proceed to purchase?`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: `Subscribe for ${p.price}`,
+                            onPress: () => router.push('/booking/checkout'),
+                          },
+                        ]
+                      )
+                    }
+                  >
+                    <Text style={styles.detailsBtnText}>View Plan Details →</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             ))}
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FAFAF9',
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 16,
-    backgroundColor: '#FFFFFF',
+  curvedHeader: {
+    backgroundColor: '#0B4A27',
+    paddingBottom: 20,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    paddingHorizontal: 16,
   },
-  title: {
-    fontSize: 22,
+  headerTitle: {
+    fontSize: 20,
     fontWeight: '800',
-    color: '#111827',
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    gap: 12,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-  },
-  tabButtonActive: {
-    backgroundColor: '#1B5E20',
-  },
-  tabText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#4B5563',
-  },
-  tabTextActive: {
     color: '#FFFFFF',
-  },
-  vehicleFilterBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  filterLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-    marginRight: 8,
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  chipActive: {
-    backgroundColor: '#E8F5E9',
-    borderColor: '#1B5E20',
-  },
-  chipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4B5563',
-  },
-  chipTextActive: {
-    color: '#1B5E20',
-  },
-  planCard: {
-    padding: 18,
-    borderRadius: 16,
-  },
-  planHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    marginTop: 6,
     marginBottom: 12,
   },
-  planTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#111827',
+  vehicleDropdownPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
   },
-  planTagline: {
-    fontSize: 13,
+  vehicleDropdownText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dropdownCaret: {
+    color: '#A7F3D0',
+    fontSize: 10,
+    marginLeft: 6,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: '#E5E7EB',
+    borderRadius: 14,
+    padding: 3,
+    marginHorizontal: 16,
+    marginVertical: 14,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 11,
+  },
+  segmentBtnActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: 12,
+    fontWeight: '700',
     color: '#6B7280',
-    marginTop: 2,
+  },
+  segmentTextActive: {
+    color: '#0F1F16',
+  },
+  planCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  planCardHeader: {
+    padding: 16,
+  },
+  planHeaderTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  vehicleTypeText: {
+    color: '#FFFFFF',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  validityBadge: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  validityLabel: {
+    fontSize: 8,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  validityBold: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0F1F16',
+  },
+  planHeroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  planTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  benefitPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  benefitPillText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  mechanicVisual: {
+    paddingLeft: 10,
+  },
+  planCardFooter: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  startingLabel: {
+    fontSize: 9.5,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 12,
   },
-  planPrice: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#1B5E20',
+  priceAmount: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0F1F16',
   },
-  planDuration: {
-    fontSize: 14,
+  periodText: {
+    fontSize: 11,
     color: '#6B7280',
-    marginLeft: 6,
-    fontWeight: '500',
+    fontWeight: '600',
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginVertical: 12,
+  detailsBtn: {
+    paddingVertical: 6,
   },
-  comingSoonRibbon: {
-    position: 'absolute',
-    top: -8,
-    right: 12,
-    backgroundColor: '#D97706',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  comingSoonText: {
-    fontSize: 10,
+  detailsBtnText: {
+    color: '#16A34A',
+    fontSize: 12,
     fontWeight: '800',
+  },
+  emptyMySub: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  emptyMySubTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F1F16',
+    marginBottom: 6,
+  },
+  emptyMySubDesc: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  browsePlansBtn: {
+    backgroundColor: '#16A34A',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  browsePlansText: {
     color: '#FFFFFF',
-    letterSpacing: 0.5,
+    fontWeight: '800',
+    fontSize: 12.5,
   },
 });

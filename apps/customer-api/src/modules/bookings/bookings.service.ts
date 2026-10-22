@@ -272,39 +272,6 @@ export class BookingsService {
       }
     }
 
-    // Always ensure at least one sample completed order exists so Order History is testable out-of-the-box
-    const samplePastOrder = {
-      id: 'bk_sample_past_1',
-      code: 'GZ-820194',
-      customerId,
-      status: 'COMPLETED',
-      serviceName: 'Periodic Maintenance & Oil Flush',
-      servicePricePaise: 99900,
-      vehicleSummary: 'Honda Activa 6G (KA01AB1234)',
-      scheduledAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-      scheduledSlotStart: new Date(Date.now() - 7 * 86400000).toISOString(),
-      address: 'HSR Layout Sector 2, Bengaluru',
-      latitude: 12.9121,
-      longitude: 77.6446,
-      totalAmountPaise: 114882,
-      paidAmountPaise: 114882,
-      balanceAmountPaise: 0,
-      paymentStatus: 'PAID',
-      paymentMethod: 'ONLINE',
-      mechanic: {
-        id: 'mech_sample',
-        name: 'Ramesh Kumar',
-        phone: '+919876543210',
-        rating: 4.9,
-        jobsCompleted: 412,
-      },
-      createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-    };
-
-    if (!mergedMap.has(samplePastOrder.id)) {
-      mergedMap.set(samplePastOrder.id, samplePastOrder);
-    }
 
     let results = Array.from(mergedMap.values());
     if (status) {
@@ -329,36 +296,7 @@ export class BookingsService {
     const found = memList.find((b) => b.id === id);
     if (found) return found;
 
-    return {
-      id,
-      code: `GZ-${id.slice(0, 6).toUpperCase()}`,
-      customerId,
-      status: 'COMPLETED',
-      scheduledSlotStart: '2026-10-15T09:00:00.000Z',
-      scheduledAt: '2026-10-15T09:00:00.000Z',
-      serviceName: 'Comprehensive General Service',
-      vehicleSummary: 'Honda Activa 6G (KA01AB1234)',
-      totalAmountPaise: 114882,
-      basePricePaise: 99900,
-      platformFeePaise: 2900,
-      taxesPaise: 17982,
-      paidAmountPaise: 114882,
-      balanceAmountPaise: 0,
-      paymentStatus: 'PAID',
-      paymentMethod: 'ONLINE',
-      vehicle: { brandName: 'Honda', modelName: 'Activa 6G', registrationNumber: 'KA01AB1234' },
-      address: 'Flat 302, Green Glen Layout, Bellandur, Bengaluru 560103',
-      mechanic: {
-        id: 'mech_456',
-        name: 'Ramesh Kumar',
-        phone: '+919123456789',
-        rating: 4.8,
-        totalJobs: 320,
-      },
-      extras: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    throw new NotFoundException('Booking not found: ' + id);
   }
 
   async getSlotHold(customerId: string, id: string) {

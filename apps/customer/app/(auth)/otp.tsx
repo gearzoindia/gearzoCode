@@ -26,7 +26,7 @@ export default function OtpScreen() {
         otp: codeToVerify,
       });
 
-      if (response.isNewUser || !response.user.name) {
+      if (response.isNewUser && !response.user?.name) {
         router.replace('/(auth)/register');
       } else {
         router.replace('/(app)/(tabs)');

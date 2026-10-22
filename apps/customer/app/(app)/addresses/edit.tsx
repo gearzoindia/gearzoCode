@@ -1,22 +1,44 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Input } from '@gearzo/ui';
+import { useCreateAddress } from '@gearzo/api-client';
 
 export default function EditAddressModal() {
   const router = useRouter();
+  const createAddressMutation = useCreateAddress();
 
   const [tag, setTag] = useState<'Home' | 'Work' | 'Other'>('Home');
   const [flat, setFlat] = useState('');
   const [area, setArea] = useState('');
   const [landmark, setLandmark] = useState('');
-  const [city, setCity] = useState('Bengaluru');
+  const [city, setCity] = useState('Hyderabad');
   const [pincode, setPincode] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
-    // Save address
-    router.back();
+  const handleSave = async () => {
+    if (!flat.trim() || !area.trim()) {
+      Alert.alert('Required Fields', 'Please enter your house/flat number and street area.');
+      return;
+    }
+    try {
+      setIsSaving(true);
+      await createAddressMutation.mutateAsync({
+        label: tag.toUpperCase(),
+        line1: flat.trim(),
+        line2: `${area.trim()}, ${city.trim()}${pincode ? ` - ${pincode.trim()}` : ''}`,
+        landmark: landmark.trim() || undefined,
+        lat: 17.4485,
+        lng: 78.3756,
+        isDefault: true,
+      });
+      router.back();
+    } catch (err: any) {
+      Alert.alert('Save Failed', err?.response?.data?.message || err?.message || 'Unable to save address.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -53,40 +75,45 @@ export default function EditAddressModal() {
 
         <Input
           label="Street / Area / Locality"
-          placeholder="e.g. Green Glen Layout, Bellandur"
+          placeholder="e.g. Madhapur / Hitec City"
           value={area}
           onChangeText={setArea}
         />
 
         <Input
           label="Landmark (Optional)"
-          placeholder="e.g. Near Sobha Iris / Behind HP Petrol Pump"
+          placeholder="e.g. Near Metro Pillar 12"
           value={landmark}
           onChangeText={setLandmark}
         />
 
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={{ flex: 1 }}>
-            <Input label="City" value={city} onChangeText={setCity} />
+            <Input
+              label="City"
+              placeholder="City"
+              value={city}
+              onChangeText={setCity}
+            />
           </View>
           <View style={{ flex: 1 }}>
             <Input
               label="Pincode"
-              placeholder="560103"
-              keyboardType="number-pad"
-              maxLength={6}
+              placeholder="500081"
               value={pincode}
               onChangeText={setPincode}
+              keyboardType="number-pad"
             />
           </View>
         </View>
 
         <Button
-          title="Save Address"
+          title={isSaving ? 'Saving...' : 'Save Address'}
           variant="primary"
           size="lg"
           onPress={handleSave}
-          style={{ marginTop: 20 }}
+          disabled={isSaving}
+          style={{ marginTop: 24 }}
         />
       </ScrollView>
     </SafeAreaView>
@@ -126,28 +153,26 @@ const styles = StyleSheet.create({
   },
   tagRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
+    gap: 10,
+    marginBottom: 16,
   },
   tagBtn: {
-    flex: 1,
-    paddingVertical: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
+    borderColor: '#D1D5DB',
   },
   tagBtnActive: {
-    backgroundColor: '#E8F5E9',
-    borderColor: '#1B5E20',
+    borderColor: '#16A34A',
+    backgroundColor: '#DCFCE7',
   },
   tagBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
     color: '#4B5563',
   },
   tagBtnTextActive: {
-    color: '#1B5E20',
+    color: '#16A34A',
+    fontWeight: '700',
   },
 });

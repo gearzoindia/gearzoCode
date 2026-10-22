@@ -28,6 +28,13 @@ export class ServicesController {
   }
 
   @Public()
+  @Get('products')
+  @ApiOperation({ summary: 'List related products / parts' })
+  async getProducts(@Query('vehicleTypeId') vehicleTypeId?: string) {
+    return this.servicesService.getProducts(vehicleTypeId);
+  }
+
+  @Public()
   @Get('services/:id')
   @ApiOperation({ summary: 'Get full service details, warranty, package items' })
   async getService(
