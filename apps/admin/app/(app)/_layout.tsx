@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@gearzo/api-client';
-import { Avatar, Badge } from '@gearzo/ui';
+import { Avatar, Badge, LoadingScreen } from '@gearzo/ui';
 
 interface NavItem {
   name: string;
@@ -51,10 +51,24 @@ export default function AdminAppLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const { width } = useWindowDimensions();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAuthenticated, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/(auth)/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   const isDesktop = width >= 768;
-  const isSuperAdmin = user?.role === 'SUPER_ADMIN' || true; // allow all in management portal
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading GearZo Admin..." />;
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handleLogout = async () => {
     await signOut();
@@ -124,9 +138,9 @@ export default function AdminAppLayout() {
               <Avatar name={user?.name || 'Admin'} size="sm" />
               <View style={{ marginLeft: 10, flex: 1 }}>
                 <Text style={styles.footerUserName} numberOfLines={1}>
-                  {user?.name || 'Ops Manager'}
+                  {user?.name || 'Administrator'}
                 </Text>
-                <Text style={styles.footerUserRole}>{user?.role || 'SUPER_ADMIN'}</Text>
+                <Text style={styles.footerUserRole}>{user?.role || 'STAFF'}</Text>
               </View>
             </View>
             <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
