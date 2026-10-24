@@ -34,11 +34,9 @@ export default function MechanicWorkConsoleScreen() {
   const [extraName, setExtraName] = useState('');
   const [extraPrice, setExtraPrice] = useState('');
   const [extraReason, setExtraReason] = useState('');
-  const [addedExtras, setAddedExtras] = useState<{ name: string; price: number }[]>([
-    { name: 'Clutch Cable Assembly', price: 380 },
-  ]);
+  const [addedExtras, setAddedExtras] = useState<{ name: string; price: number }[]>([]);
 
-  const [photosUploaded, setPhotosUploaded] = useState(2);
+  const [photosUploaded, setPhotosUploaded] = useState(0);
 
   const toggleTask = (taskId: string) => {
     setTasks((prev) =>

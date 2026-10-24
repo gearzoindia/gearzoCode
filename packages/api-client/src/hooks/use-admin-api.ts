@@ -549,6 +549,31 @@ export function useAdminCatalogueServices() {
   });
 }
 
+export function useAdminCreateService() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      categoryId: string;
+      name: string;
+      description?: string;
+      durationMin: number;
+      priceType?: 'FIXED' | 'HOURLY' | 'CUSTOM_QUOTE';
+      vehicleTypes: string[];
+      allowedModes: string[];
+      price?: number;
+      basePricePaise?: number;
+      includes?: string[];
+      excludes?: string[];
+    }) => {
+      const res = await adminApi.post('/admin/catalogue/services', payload);
+      return (res.data as any)?.data || res.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'catalogue', 'services'] });
+    },
+  });
+}
+
 export function useAdminVehicleBrands() {
   return useQuery({
     queryKey: ['admin', 'vehicles', 'brands'],

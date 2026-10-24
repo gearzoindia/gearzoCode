@@ -8,7 +8,7 @@ import { useAdminVerifyTotp } from '@gearzo/api-client';
 export default function AdminTotpScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tempToken?: string }>();
-  const tempToken = params.tempToken || 'dummy-token';
+  const tempToken = params.tempToken || '';
 
   const [code, setCode] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

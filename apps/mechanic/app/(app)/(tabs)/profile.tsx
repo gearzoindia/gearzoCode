@@ -1,26 +1,35 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, StyleSheet, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '@gearzo/api-client';
+import { useAuth, useMechanicEarnings } from '@gearzo/api-client';
 import { Avatar, Card, Badge } from '@gearzo/ui';
 
 export default function MechanicProfileTab() {
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const { data: earnings } = useMechanicEarnings();
 
-  const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out of GearZo Partner?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log Out',
-        style: 'destructive',
-        onPress: async () => {
-          await signOut();
-          router.replace('/(auth)/welcome');
+  const handleLogout = async () => {
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined' ? window.confirm('Are you sure you want to log out of GearZo Partner?') : true;
+      if (confirmed) {
+        await signOut();
+        router.replace('/(auth)/welcome');
+      }
+    } else {
+      Alert.alert('Log Out', 'Are you sure you want to log out of GearZo Partner?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            router.replace('/(auth)/welcome');
+          },
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   return (
@@ -28,14 +37,14 @@ export default function MechanicProfileTab() {
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Header User Card */}
         <View style={styles.userHeader}>
-          <Avatar name={user?.name || 'Ramesh Kumar'} size="lg" />
+          <Avatar name={user?.name || 'Partner Mechanic'} size="lg" />
           <View style={{ marginLeft: 16, flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.userName}>{user?.name || 'Ramesh Kumar'}</Text>
+              <Text style={styles.userName}>{user?.name || 'Partner Mechanic'}</Text>
               <Badge label="VERIFIED" variant="success" />
             </View>
-            <Text style={styles.userPhone}>{user?.phone || '+91 98765 43210'}</Text>
-            <Text style={styles.userRole}>Independent Mobile Mechanic • 5 yrs exp</Text>
+            <Text style={styles.userPhone}>{user?.phone || ''}</Text>
+            <Text style={styles.userRole}>GearZo Verified Mechanic</Text>
           </View>
         </View>
 
@@ -43,17 +52,17 @@ export default function MechanicProfileTab() {
         <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
           <Card variant="default" style={styles.metricsCard}>
             <View style={styles.metricItem}>
-              <Text style={styles.metricVal}>4.9 ⭐</Text>
+              <Text style={styles.metricVal}>5.0 ⭐</Text>
               <Text style={styles.metricLabel}>Lifetime Rating</Text>
             </View>
             <View style={styles.vDivider} />
             <View style={styles.metricItem}>
-              <Text style={styles.metricVal}>342</Text>
+              <Text style={styles.metricVal}>{earnings?.completedJobsCount || 0}</Text>
               <Text style={styles.metricLabel}>Jobs Done</Text>
             </View>
             <View style={styles.vDivider} />
             <View style={styles.metricItem}>
-              <Text style={styles.metricVal}>98%</Text>
+              <Text style={styles.metricVal}>100%</Text>
               <Text style={styles.metricLabel}>On-Time Arrival</Text>
             </View>
           </Card>

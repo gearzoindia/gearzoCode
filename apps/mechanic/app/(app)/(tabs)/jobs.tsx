@@ -21,48 +21,9 @@ export default function MechanicJobsTab() {
 
   const { data: jobs, isLoading, refetch, isRefetching } = useMechanicJobs();
 
-  const mockJobs: Booking[] = jobs || [
-    {
-      id: 'gz-job-101',
-      customerId: 'cust-1',
-      serviceId: 'srv-std',
-      serviceName: 'Comprehensive 40-Point Periodic Service',
-      servicePricePaise: 149900,
-      vehicleId: 'veh-1',
-      vehicleSummary: 'Royal Enfield Classic 350 (KA05MB9912)',
-      status: 'ON_THE_WAY',
-      scheduledAt: new Date().toISOString(),
-      address: 'Villa 14, Palm Meadows, Whitefield, Bengaluru',
-      latitude: 12.9698,
-      longitude: 77.7499,
-      totalAmountPaise: 149900,
-      paidAmountPaise: 149900,
-      balanceAmountPaise: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'gz-job-102',
-      customerId: 'cust-2',
-      serviceId: 'srv-brake',
-      serviceName: 'Front & Rear Brake Pad Replacement',
-      servicePricePaise: 69900,
-      vehicleId: 'veh-2',
-      vehicleSummary: 'Maruti Suzuki Swift (KA01MC4401)',
-      status: 'COMPLETED',
-      scheduledAt: new Date(Date.now() - 86400000).toISOString(),
-      address: '2nd Cross, Koramangala 4th Block, Bengaluru',
-      latitude: 12.9352,
-      longitude: 77.6245,
-      totalAmountPaise: 82500,
-      paidAmountPaise: 82500,
-      balanceAmountPaise: 0,
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 86400000).toISOString(),
-    },
-  ];
+  const realJobs: Booking[] = jobs || [];
 
-  const filteredJobs = mockJobs.filter((job) => {
+  const filteredJobs = realJobs.filter((job) => {
     if (selectedFilter === 'ONGOING') {
       return ['ASSIGNED', 'ON_THE_WAY', 'ARRIVED', 'IN_PROGRESS'].includes(job.status);
     }
@@ -102,69 +63,69 @@ export default function MechanicJobsTab() {
     }
   };
 
-  const filters: { key: JobFilter; label: string }[] = [
-    { key: 'ONGOING', label: 'Active & In Progress' },
-    { key: 'UPCOMING', label: 'Scheduled' },
-    { key: 'COMPLETED', label: 'Completed' },
-  ];
-
-  if (isLoading && !isRefetching) {
-    return <LoadingScreen message="Loading partner jobs..." />;
-  }
-
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Partner Job Queue</Text>
-      </View>
-
-      <View style={styles.filterRow}>
-        {filters.map((f) => {
-          const isSelected = selectedFilter === f.key;
-          return (
-            <TouchableOpacity
-              key={f.key}
-              style={[styles.filterChip, isSelected && styles.filterChipActive]}
-              onPress={() => setSelectedFilter(f.key)}
+      {/* Tab Filter Pill Bar */}
+      <View style={styles.filterBar}>
+        {(['ONGOING', 'UPCOMING', 'COMPLETED'] as JobFilter[]).map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.filterPill, selectedFilter === tab && styles.filterPillActive]}
+            onPress={() => setSelectedFilter(tab)}
+          >
+            <Text
+              style={[
+                styles.filterPillText,
+                selectedFilter === tab && styles.filterPillTextActive,
+              ]}
             >
-              <Text style={[styles.filterText, isSelected && styles.filterTextActive]}>
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+              {tab.charAt(0) + tab.slice(1).toLowerCase()}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      <FlatList
-        data={filteredJobs}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.listContainer, filteredJobs.length === 0 && { flex: 1, justifyContent: 'center' }]}
-        refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#1B5E20" />
-        }
-        renderItem={({ item }) => (
-          <BookingCard
-            id={item.id}
-            serviceName={item.serviceName}
-            vehicleSummary={item.vehicleSummary}
-            scheduledAt={item.scheduledAt}
-            status={item.status}
-            totalAmountPaise={item.totalAmountPaise}
-            actionTitle={getActionTitle(item.status)}
-            onAction={() => handleAction(item)}
-            onPress={() => router.push(`/job/${item.id}`)}
-            style={{ marginBottom: 12 }}
-          />
-        )}
-        ListEmptyComponent={
-          <EmptyState
-            title="No Jobs in this Category"
-            description="Keep your duty status Online to receive instant job dispatch offers."
-            buttonTitle="Refresh Jobs"
-            onAction={refetch}
-          />
-        }
-      />
+      {isLoading ? (
+        <LoadingScreen message="Loading assigned jobs..." />
+      ) : filteredJobs.length === 0 ? (
+        <EmptyState
+          icon="📋"
+          title={`No ${selectedFilter.toLowerCase()} jobs`}
+          description={
+            selectedFilter === 'ONGOING'
+              ? 'You do not have any active or dispatched jobs at the moment.'
+              : `There are no ${selectedFilter.toLowerCase()} jobs on your record.`
+          }
+          actionTitle="Refresh List"
+          onAction={() => refetch()}
+        />
+      ) : (
+        <FlatList
+          data={filteredJobs}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor="#1B5E20"
+            />
+          }
+          renderItem={({ item }) => (
+            <BookingCard
+              id={item.id}
+              serviceName={item.serviceName}
+              vehicleSummary={item.vehicleSummary}
+              scheduledAt={item.scheduledAt}
+              status={item.status}
+              totalAmountPaise={item.totalAmountPaise}
+              actionTitle={getActionTitle(item.status)}
+              onAction={() => handleAction(item)}
+              onPress={() => router.push(`/job/${item.id}`)}
+            />
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -174,45 +135,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  filterRow: {
+  filterBar: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
     gap: 8,
   },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  filterPill: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
     borderRadius: 20,
     backgroundColor: '#F3F4F6',
   },
-  filterChipActive: {
+  filterPillActive: {
     backgroundColor: '#1B5E20',
   },
-  filterText: {
+  filterPillText: {
     fontSize: 13,
     fontWeight: '600',
     color: '#4B5563',
   },
-  filterTextActive: {
+  filterPillTextActive: {
     color: '#FFFFFF',
-  },
-  listContainer: {
-    padding: 16,
   },
 });

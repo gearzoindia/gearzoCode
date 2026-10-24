@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -9,74 +9,33 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Badge, Button } from '@gearzo/ui';
-import { useMechanicEarnings } from '@gearzo/api-client';
-
-interface LedgerItem {
-  id: string;
-  type: 'CREDIT' | 'DEBIT';
-  title: string;
-  sub: string;
-  amountPaise: number;
-  date: string;
-}
+import { Card, Badge, Button, EmptyState } from '@gearzo/ui';
+import { useMechanicEarnings, useMechanicLedger } from '@gearzo/api-client';
 
 export default function MechanicEarningsTab() {
-  const { data: earnings, refetch, isRefetching } = useMechanicEarnings();
+  const { data: earnings, refetch: refetchEarnings, isRefetching: isRefetchingEarnings } = useMechanicEarnings();
+  const { data: ledgerData, refetch: refetchLedger, isRefetching: isRefetchingLedger } = useMechanicLedger();
 
-  const [ledger] = useState<LedgerItem[]>([
-    {
-      id: 'tx-1',
-      type: 'CREDIT',
-      title: 'Service Payout: 40-Point Periodic Service',
-      sub: 'Job #GZ-101 • Royal Enfield Classic 350',
-      amountPaise: 119900,
-      date: 'Today, 02:45 PM',
-    },
-    {
-      id: 'tx-2',
-      type: 'CREDIT',
-      title: 'Extra Part Reimbursement: Clutch Cable',
-      sub: 'Approved addition by customer',
-      amountPaise: 38000,
-      date: 'Today, 02:40 PM',
-    },
-    {
-      id: 'tx-3',
-      type: 'DEBIT',
-      title: 'Platform Tech Commission (10%)',
-      sub: 'Auto deducted on order completion',
-      amountPaise: 11990,
-      date: 'Today, 02:45 PM',
-    },
-    {
-      id: 'tx-4',
-      type: 'CREDIT',
-      title: 'Doorstep Emergency Jumpstart',
-      sub: 'Job #GZ-098 • Maruti Swift',
-      amountPaise: 45000,
-      date: 'Yesterday, 06:15 PM',
-    },
-    {
-      id: 'tx-5',
-      type: 'DEBIT',
-      title: 'Bank IMPS Payout Sent',
-      sub: 'Ref #IMPS98231 • HDFC Bank ***1234',
-      amountPaise: 320000,
-      date: '10 Oct, 11:30 AM',
-    },
-  ]);
+  const ledgerEntries = ledgerData?.entries || [];
 
   const handleWithdraw = () => {
+    if (walletPaise <= 0) {
+      Alert.alert('No Balance', 'You currently do not have any withdrawable balance in your wallet.');
+      return;
+    }
     Alert.alert(
       'Withdrawal Request Initiated',
-      '₹4,850.00 will be transferred to your registered HDFC bank account via instant IMPS.'
+      `₹${(walletPaise / 100).toFixed(2)} will be transferred to your registered bank account via instant IMPS.`
     );
   };
 
-  const walletPaise = earnings?.walletBalancePaise || 485000;
-  const todayPaise = earnings?.todayPaise || 165000;
-  const thisWeekPaise = earnings?.thisWeekPaise || 984000;
+  const handleRefresh = async () => {
+    await Promise.all([refetchEarnings(), refetchLedger()]);
+  };
+
+  const walletPaise = earnings?.walletBalancePaise || 0;
+  const todayPaise = earnings?.todayPaise || 0;
+  const thisWeekPaise = earnings?.thisWeekPaise || 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -87,7 +46,11 @@ export default function MechanicEarningsTab() {
       <ScrollView
         contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#1B5E20" />
+          <RefreshControl
+            refreshing={isRefetchingEarnings || isRefetchingLedger}
+            onRefresh={handleRefresh}
+            tintColor="#1B5E20"
+          />
         }
       >
         {/* Main Wallet Card */}
@@ -98,60 +61,89 @@ export default function MechanicEarningsTab() {
           </Text>
 
           <View style={styles.bankTag}>
-            <Text style={{ fontSize: 14, marginRight: 6 }}>🏦</Text>
-            <Text style={styles.bankTagText}>Linked: HDFC Bank A/C ending in 1234</Text>
+            <Text style={{ fontSize: 13, color: '#1B5E20', fontWeight: '700' }}>
+              🏦 Instant IMPS Transfer Enabled
+            </Text>
           </View>
 
           <Button
-            title="Transfer to Bank Now (IMPS)"
-            variant="secondary"
-            size="lg"
-            style={{ backgroundColor: '#FFFFFF', marginTop: 16 }}
-            textStyle={{ color: '#1B5E20', fontWeight: '800' }}
+            title="Request Instant Payout →"
+            variant="primary"
+            size="md"
+            disabled={walletPaise <= 0}
             onPress={handleWithdraw}
+            style={{ marginTop: 14 }}
           />
         </Card>
 
-        {/* Periods Breakdown */}
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={styles.statLabel}>Today</Text>
-            <Text style={styles.statVal}>₹{(todayPaise / 100).toLocaleString('en-IN')}</Text>
-          </View>
+        {/* Breakdown Metric Cards */}
+        <Text style={styles.sectionHeader}>Performance Periods</Text>
+        <View style={styles.periodRow}>
+          <Card variant="default" style={styles.periodCard}>
+            <Text style={styles.periodLabel}>Today</Text>
+            <Text style={styles.periodValue}>
+              ₹{(todayPaise / 100).toLocaleString('en-IN')}
+            </Text>
+            <Text style={styles.periodSub}>{earnings?.completedJobsCount || 0} jobs done</Text>
+          </Card>
 
-          <View style={styles.statBox}>
-            <Text style={styles.statLabel}>This Week</Text>
-            <Text style={styles.statVal}>₹{(thisWeekPaise / 100).toLocaleString('en-IN')}</Text>
-          </View>
+          <Card variant="default" style={styles.periodCard}>
+            <Text style={styles.periodLabel}>This Week</Text>
+            <Text style={styles.periodValue}>
+              ₹{(thisWeekPaise / 100).toLocaleString('en-IN')}
+            </Text>
+            <Text style={styles.periodSub}>7-day rolling</Text>
+          </Card>
         </View>
 
-        {/* Transaction Ledger */}
-        <Text style={styles.sectionTitle}>Recent Transactions</Text>
-        <Card variant="default" style={{ padding: 0, borderRadius: 12, overflow: 'hidden' }}>
-          {ledger.map((item, idx) => {
-            const isCredit = item.type === 'CREDIT';
-            return (
-              <View key={item.id}>
-                <View style={styles.txRow}>
-                  <View style={[styles.txIconWrap, isCredit ? styles.iconCredit : styles.iconDebit]}>
-                    <Text style={{ fontSize: 18 }}>{isCredit ? '↓' : '↑'}</Text>
-                  </View>
+        {/* Detailed Transactions List */}
+        <View style={styles.txHeaderRow}>
+          <Text style={styles.sectionHeader}>Transaction History</Text>
+          <Text style={styles.txCount}>{ledgerEntries.length} entries</Text>
+        </View>
 
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={styles.txTitle}>{item.title}</Text>
-                    <Text style={styles.txSub}>{item.sub}</Text>
-                    <Text style={styles.txDate}>{item.date}</Text>
+        {ledgerEntries.length === 0 ? (
+          <EmptyState
+            icon="💳"
+            title="No Transactions Yet"
+            description="Your payouts and service earnings will appear here once jobs are completed."
+          />
+        ) : (
+          <View style={{ gap: 10 }}>
+            {ledgerEntries.map((item: any) => {
+              const isCredit = item.type === 'CREDIT' || item.type === 'JOB_EARNING' || item.type === 'BONUS';
+              return (
+                <Card key={item.id} variant="default" style={styles.txCard}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View
+                      style={[
+                        styles.txIconWrap,
+                        { backgroundColor: isCredit ? '#DCFCE7' : '#FEE2E2' },
+                      ]}
+                    >
+                      <Text style={{ fontSize: 16 }}>{isCredit ? '↓' : '↑'}</Text>
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.txTitle}>{item.title || item.description || item.type}</Text>
+                      <Text style={styles.txSub}>{item.sub || item.booking?.code || new Date(item.createdAt).toLocaleDateString('en-IN')}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text
+                        style={[
+                          styles.txAmount,
+                          { color: isCredit ? '#15803D' : '#DC2626' },
+                        ]}
+                      >
+                        {isCredit ? '+' : '-'}₹{((item.amountPaise || 0) / 100).toFixed(2)}
+                      </Text>
+                      <Text style={styles.txDate}>{item.date || new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                    </View>
                   </View>
-
-                  <Text style={[styles.txAmount, isCredit ? styles.amountCredit : styles.amountDebit]}>
-                    {isCredit ? '+' : '-'}₹{(item.amountPaise / 100).toFixed(2)}
-                  </Text>
-                </View>
-                {idx < ledger.length - 1 && <View style={styles.divider} />}
-              </View>
-            );
-          })}
-        </Card>
+                </Card>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -167,79 +159,79 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: '#E5E7EB',
   },
   title: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
     color: '#111827',
   },
   mainCard: {
     padding: 20,
-    borderRadius: 16,
-    backgroundColor: '#1B5E20',
-    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
   },
   mainLabel: {
     fontSize: 13,
-    color: '#C8E6C9',
-    fontWeight: '500',
+    color: '#6B7280',
+    fontWeight: '600',
   },
   mainAmount: {
     fontSize: 34,
     fontWeight: '800',
-    color: '#FFFFFF',
-    marginTop: 4,
+    color: '#111827',
+    marginVertical: 4,
   },
   bankTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 10,
+    backgroundColor: '#DCFCE7',
     paddingVertical: 6,
-    borderRadius: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
     alignSelf: 'flex-start',
-    marginTop: 10,
+    marginTop: 4,
   },
-  bankTagText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '600',
+  sectionHeader: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+    marginTop: 22,
+    marginBottom: 10,
   },
-  statsRow: {
+  periodRow: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 20,
   },
-  statBox: {
+  periodCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    padding: 14,
   },
-  statLabel: {
+  periodLabel: {
     fontSize: 12,
     color: '#6B7280',
-    fontWeight: '500',
+    fontWeight: '600',
   },
-  statVal: {
+  periodValue: {
     fontSize: 20,
     fontWeight: '800',
     color: '#111827',
     marginTop: 4,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 10,
+  periodSub: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 2,
   },
-  txRow: {
+  txHeaderRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+  },
+  txCount: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  txCard: {
+    padding: 14,
   },
   txIconWrap: {
     width: 36,
@@ -247,42 +239,24 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
-  },
-  iconCredit: {
-    backgroundColor: '#DCFCE7',
-  },
-  iconDebit: {
-    backgroundColor: '#FEE2E2',
   },
   txTitle: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#111827',
   },
   txSub: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#6B7280',
     marginTop: 2,
+  },
+  txAmount: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   txDate: {
     fontSize: 11,
     color: '#9CA3AF',
     marginTop: 2,
-  },
-  txAmount: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  amountCredit: {
-    color: '#166534',
-  },
-  amountDebit: {
-    color: '#DC2626',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginLeft: 64,
   },
 });

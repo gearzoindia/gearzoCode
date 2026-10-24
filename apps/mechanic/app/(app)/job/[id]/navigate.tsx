@@ -2,23 +2,37 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Card } from '@gearzo/ui';
-import { useUpdateJobStep } from '@gearzo/api-client';
+import { Button, Card, LoadingScreen } from '@gearzo/ui';
+import { useUpdateJobStep, useMechanicJobDetail } from '@gearzo/api-client';
 
 export default function MechanicNavigateScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
+  const { data: job, isLoading } = useMechanicJobDetail(id || '');
   const updateStepMutation = useUpdateJobStep();
 
   const handleOpenGoogleMaps = () => {
-    Linking.openURL('https://maps.google.com/?q=12.9698,77.7499');
+    if (job?.latitude && job?.longitude) {
+      Linking.openURL(`https://maps.google.com/?q=${job.latitude},${job.longitude}`);
+    } else if (job?.address) {
+      Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(job.address)}`);
+    } else {
+      Linking.openURL('https://maps.google.com');
+    }
+  };
+
+  const handleCall = () => {
+    const phone = (job as any)?.customer?.phone || (job as any)?.customerPhone;
+    if (phone) {
+      Linking.openURL(`tel:${phone}`);
+    }
   };
 
   const handleArrived = async () => {
     try {
       await updateStepMutation.mutateAsync({
-        jobId: id || 'current',
+        jobId: id || '',
         step: 'ARRIVED',
       });
     } catch {
@@ -26,6 +40,10 @@ export default function MechanicNavigateScreen() {
     }
     router.replace(`/job/${id}/start`);
   };
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading Navigation..." />;
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -40,17 +58,19 @@ export default function MechanicNavigateScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Map Simulation Canvas */}
+      {/* Map Canvas */}
       <View style={styles.mapCanvas}>
         <View style={styles.routeOverlay}>
           <Text style={{ fontSize: 32 }}>🏍️ 💨 💨 🏠</Text>
         </View>
 
         <View style={styles.turnCard}>
-          <Text style={styles.turnIcon}>↱</Text>
+          <Text style={styles.turnIcon}>📍</Text>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.turnDistance}>In 250 meters</Text>
-            <Text style={styles.turnInstruction}>Turn right onto Palm Meadows Main Ave</Text>
+            <Text style={styles.turnDistance}>{job?.vehicleSummary || 'Service Order'}</Text>
+            <Text style={styles.turnInstruction} numberOfLines={2}>
+              {job?.address || 'Customer destination'}
+            </Text>
           </View>
         </View>
       </View>
@@ -59,13 +79,13 @@ export default function MechanicNavigateScreen() {
       <View style={styles.bottomSheet}>
         <Card variant="elevated" style={styles.infoCard}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View>
-              <Text style={styles.etaText}>1.8 km • 6 mins away</Text>
-              <Text style={styles.addressText} numberOfLines={1}>
-                Villa 14, Palm Meadows, Whitefield
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={styles.etaText}>Destination Address</Text>
+              <Text style={styles.addressText} numberOfLines={2}>
+                {job?.address || 'Address provided by customer'}
               </Text>
             </View>
-            <TouchableOpacity style={styles.callCircle} onPress={() => Linking.openURL('tel:+919876543210')}>
+            <TouchableOpacity style={styles.callCircle} onPress={handleCall}>
               <Text style={{ fontSize: 18 }}>📞</Text>
             </TouchableOpacity>
           </View>
@@ -92,60 +112,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
+    zIndex: 10,
   },
   backBtn: {
     width: 36,
     height: 36,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
     color: '#111827',
   },
   mapCanvas: {
     flex: 1,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   routeOverlay: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 30,
-    elevation: 4,
+    alignItems: 'center',
   },
   turnCard: {
     position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: '#1E293B',
+    top: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: '#111827',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 6,
   },
   turnIcon: {
-    fontSize: 28,
-    color: '#38BDF8',
-    fontWeight: '800',
+    fontSize: 24,
+    color: '#22C55E',
   },
   turnDistance: {
-    fontSize: 14,
-    color: '#94A3B8',
+    fontSize: 12,
+    color: '#9CA3AF',
     fontWeight: '600',
   },
   turnInstruction: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
     marginTop: 2,
@@ -153,24 +169,29 @@ const styles = StyleSheet.create({
   bottomSheet: {
     padding: 20,
     backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 8,
   },
   infoCard: {
-    padding: 16,
-    borderRadius: 12,
+    padding: 14,
     marginBottom: 16,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F9FAFB',
   },
   etaText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#1B5E20',
+    fontSize: 12,
+    color: '#15803D',
+    fontWeight: '700',
   },
   addressText: {
-    fontSize: 13,
-    color: '#4B5563',
-    marginTop: 2,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginTop: 4,
   },
   callCircle: {
     width: 44,

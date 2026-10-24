@@ -35,6 +35,16 @@ export class ServicesController {
   }
 
   @Public()
+  @Get(['search', 'services/search'])
+  @ApiOperation({ summary: 'Search services by keyword, category, and vehicle' })
+  async search(@Query() dto: SearchServiceDto, @Query('q') q?: string) {
+    if (q && !dto.query) {
+      dto.query = q;
+    }
+    return this.servicesService.searchServices(dto);
+  }
+
+  @Public()
   @Get('services/:id')
   @ApiOperation({ summary: 'Get full service details, warranty, package items' })
   async getService(
@@ -43,15 +53,5 @@ export class ServicesController {
     @Query('areaId') areaId?: string,
   ) {
     return this.servicesService.getServiceById(id, vehicleTypeId, areaId);
-  }
-
-  @Public()
-  @Get(['search', 'services/search'])
-  @ApiOperation({ summary: 'Search services by keyword, category, and vehicle' })
-  async search(@Query() dto: SearchServiceDto, @Query('q') q?: string) {
-    if (q && !dto.query) {
-      dto.query = q;
-    }
-    return this.servicesService.searchServices(dto);
   }
 }

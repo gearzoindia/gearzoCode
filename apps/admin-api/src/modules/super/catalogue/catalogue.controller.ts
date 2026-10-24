@@ -87,7 +87,7 @@ export class CatalogueController {
     return this.catalogueService.findService(id);
   }
 
-  @Post('services')
+  @Post(['services', 'catalogue/services', 'admin/catalogue/services'])
   @Permissions('CATALOGUE_MANAGE')
   @ApiOperation({ summary: 'Create service with vehicle types, duration, and modes' })
   async createService(

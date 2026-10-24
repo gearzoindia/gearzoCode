@@ -101,13 +101,24 @@ export class CatalogueService {
 
   // ================= SERVICES =================
   async findAllServices() {
-    return this.prisma.services.findMany({
+    const list = await this.prisma.services.findMany({
       include: {
         category: { select: { id: true, name: true } },
         servicePrices: { take: 5 },
       },
       orderBy: [{ categoryId: 'asc' }, { sortOrder: 'asc' }],
     });
+
+    return list.map((s) => ({
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      status: s.isActive ? 'ACTIVE' : 'INACTIVE',
+      durationMinutes: s.durationMin,
+      vehicleTypes: s.vehicleTypes,
+      basePricePaise: s.servicePrices[0]?.pricePaise ?? 0,
+      category: s.category?.name ?? 'General',
+    }));
   }
 
   async findService(id: string) {
@@ -119,32 +130,65 @@ export class CatalogueService {
     return s;
   }
 
-  async createService(dto: CreateServiceDto, adminId: string) {
+  async createService(dto: any, adminId: string) {
+    const MODE_MAP: Record<string, string> = {
+      DOORSTEP: 'DOORSTEP',
+      ROADSIDE: 'TOWING',
+      WORKSHOP: 'GARAGE_VISIT',
+      GARAGE: 'GARAGE_VISIT',
+      GARAGE_VISIT: 'GARAGE_VISIT',
+      PICKUP_DROP: 'PICKUP_DROP',
+      TOWING: 'TOWING',
+    };
+    const mappedModes = Array.from(
+      new Set(
+        (Array.isArray(dto.allowedModes) ? dto.allowedModes : ['DOORSTEP'])
+          .map((m: string) => MODE_MAP[m] || 'DOORSTEP')
+      )
+    );
+
     const created = await this.prisma.services.create({
       data: {
         categoryId: dto.categoryId,
         name: dto.name,
-        description: dto.description,
+        description: dto.description || '',
         includes: dto.includes || [],
         excludes: dto.excludes || [],
-        durationMin: dto.durationMin,
-        priceType: dto.priceType,
-        vehicleTypes: dto.vehicleTypes,
-        allowedModes: dto.allowedModes,
+        durationMin: Number(dto.durationMin) || 30,
+        priceType: dto.priceType || 'FIXED',
+        vehicleTypes: dto.vehicleTypes || ['TWO_WHEELER'],
+        allowedModes: mappedModes as any,
         isPackage: dto.isPackage ?? false,
         isActive: dto.isActive ?? true,
         sortOrder: dto.sortOrder ?? 0,
       },
     });
 
-    await this.audit.log({
-      actorId: adminId,
-      action: 'SERVICE_CREATE',
-      entity: 'Services',
-      entityId: created.id,
-      after: created,
-      reason: 'Created catalog service',
-    });
+    if (dto.basePricePaise || dto.price) {
+      const pricePaise = dto.basePricePaise || Math.round(Number(dto.price) * 100);
+      for (const vt of created.vehicleTypes) {
+        await this.prisma.servicePrice.create({
+          data: {
+            serviceId: created.id,
+            vehicleType: vt,
+            pricePaise,
+          },
+        });
+      }
+    }
+
+    try {
+      await this.audit.log({
+        actorId: adminId || 'admin',
+        action: 'SERVICE_CREATE',
+        entity: 'Services',
+        entityId: created.id,
+        after: created,
+        reason: 'Created catalog service',
+      });
+    } catch {
+      // audit log fallback
+    }
 
     return created;
   }

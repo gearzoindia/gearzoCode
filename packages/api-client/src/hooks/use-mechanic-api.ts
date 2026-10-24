@@ -30,10 +30,22 @@ export function useMechanicSendOtp() {
 export function useMechanicVerifyOtp() {
   const { signIn } = useAuthStore();
   return useMutation({
-    mutationFn: async (input: VerifyOtpInput) => {
-      const res = await mechanicApi.post<AuthResponse>('/auth/verify-otp', input);
-      await signIn(res.data.tokens, res.data.user);
-      return res.data;
+    mutationFn: async (input: VerifyOtpInput & { code?: string }) => {
+      const payload = {
+        ...input,
+        code: input.code || (input as any).otp,
+        otp: (input as any).otp || input.code,
+      };
+      const res = await mechanicApi.post<AuthResponse>('/auth/verify-otp', payload);
+      const data = res.data;
+      const tokens = (data as any).tokens || {
+        accessToken: (data as any).accessToken,
+        refreshToken: (data as any).refreshToken,
+      };
+      if (tokens?.accessToken && data.user) {
+        await signIn(tokens, data.user);
+      }
+      return data;
     },
   });
 }
@@ -111,7 +123,13 @@ export function useSaveMechanicLocation() {
 export function useSaveMechanicKyc() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (formData: { aadharNumber: string; panNumber: string; documentUrl?: string }) => {
+    mutationFn: async (formData: {
+      aadharNumber?: string;
+      panNumber?: string;
+      dlNumber?: string;
+      documents?: Array<{ docType: string; fileKey: string; numberLast4?: string }>;
+      documentUrl?: string;
+    }) => {
       const res = await mechanicApi.post('/mechanic/onboarding/kyc', formData);
       return res.data;
     },
@@ -248,6 +266,18 @@ export function useMechanicEarnings() {
     queryKey: ['mechanic', 'earnings'],
     queryFn: async (): Promise<MechanicEarningsSummary> => {
       const res = await mechanicApi.get<MechanicEarningsSummary>('/mechanic/earnings');
+      return res.data;
+    },
+  });
+}
+
+export function useMechanicLedger(page = 1, limit = 20) {
+  return useQuery({
+    queryKey: ['mechanic', 'earnings', 'ledger', page, limit],
+    queryFn: async () => {
+      const res = await mechanicApi.get<{ entries: any[]; pagination: any }>(
+        `/mechanic/earnings/ledger?page=${page}&limit=${limit}`
+      );
       return res.data;
     },
   });

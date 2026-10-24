@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Card, Badge } from '@gearzo/ui';
-import { useUpdateJobStep } from '@gearzo/api-client';
+import { Button, Card, Badge, LoadingScreen } from '@gearzo/ui';
+import { useUpdateJobStep, useMechanicJobDetail } from '@gearzo/api-client';
 
 export default function MechanicJobCompleteScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
+  const { data: job, isLoading } = useMechanicJobDetail(id || '');
   const [customerRating, setCustomerRating] = useState(5);
   const [paymentCollected, setPaymentCollected] = useState(true);
 
@@ -17,7 +18,7 @@ export default function MechanicJobCompleteScreen() {
   const handleFinishJob = async () => {
     try {
       await updateStepMutation.mutateAsync({
-        jobId: id || 'current',
+        jobId: id || '',
         step: 'COMPLETED',
       });
     } catch {
@@ -26,6 +27,14 @@ export default function MechanicJobCompleteScreen() {
     Alert.alert('Job Completed!', 'Earnings have been credited to your GearZo Partner Wallet.');
     router.replace('/(app)/(tabs)');
   };
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading Settlement..." />;
+  }
+
+  const totalPaise = job?.totalAmountPaise || job?.servicePricePaise || 0;
+  const platformFeePaise = Math.round(totalPaise * 0.1);
+  const netPayoutPaise = totalPaise - platformFeePaise;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -39,68 +48,60 @@ export default function MechanicJobCompleteScreen() {
           <Text style={styles.cardHeader}>Job Settlement Summary</Text>
 
           <View style={styles.row}>
-            <Text style={styles.label}>Standard Service Labour</Text>
-            <Text style={styles.value}>₹999.00</Text>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={styles.label}>Approved Extra: Clutch Cable</Text>
-            <Text style={styles.value}>₹380.00</Text>
+            <Text style={styles.label}>{job?.serviceName || 'Service Order'}</Text>
+            <Text style={styles.value}>₹{(totalPaise / 100).toFixed(2)}</Text>
           </View>
 
           <View style={styles.divider} />
 
           <View style={styles.row}>
             <Text style={styles.label}>Total Customer Invoice</Text>
-            <Text style={styles.valueBold}>₹1,379.00</Text>
+            <Text style={styles.valueBold}>₹{(totalPaise / 100).toFixed(2)}</Text>
           </View>
 
           <View style={styles.row}>
             <Text style={styles.label}>GearZo Platform Fee (10%)</Text>
-            <Text style={[styles.value, { color: '#DC2626' }]}>-₹99.90</Text>
+            <Text style={[styles.value, { color: '#DC2626' }]}>-₹{(platformFeePaise / 100).toFixed(2)}</Text>
           </View>
 
-          <View style={styles.divider} />
-
-          <View style={styles.payoutHighlight}>
-            <Text style={styles.payoutText}>Your Net Payout</Text>
-            <Text style={styles.payoutAmount}>₹1,279.10</Text>
+          <View style={styles.row}>
+            <Text style={styles.label}>Net Credited to Partner Wallet</Text>
+            <Text style={[styles.valueBold, { color: '#15803D' }]}>+₹{(netPayoutPaise / 100).toFixed(2)}</Text>
           </View>
         </Card>
 
-        {/* Payment Collection Status */}
-        <Text style={styles.sectionHeader}>Payment Collection</Text>
+        {/* Payment Collection State */}
+        <Text style={styles.sectionTitle}>Payment Collection</Text>
         <Card variant="default" style={styles.paymentCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Text style={{ fontSize: 24 }}>💳</Text>
-              <View>
-                <Text style={styles.paymentMethod}>Prepaid via Online UPI</Text>
-                <Text style={styles.paymentSub}>Payment captured automatically</Text>
-              </View>
+            <View>
+              <Text style={styles.payStatusTitle}>
+                {job?.status === 'COMPLETED' ? 'Settled Online' : 'Digital Pre-Paid Order'}
+              </Text>
+              <Text style={styles.payStatusSub}>Prepaid securely by customer via GearZo Gateway</Text>
             </View>
             <Badge label="PAID" variant="success" />
           </View>
         </Card>
 
-        {/* Rate Customer */}
-        <Text style={styles.sectionHeader}>Rate the Customer</Text>
+        {/* Rate Vehicle Owner */}
+        <Text style={styles.sectionTitle}>Rate Customer Experience</Text>
         <Card variant="default" style={styles.ratingCard}>
-          <Text style={styles.ratingTitle}>How was your experience with the customer?</Text>
-          <View style={styles.starsRow}>
+          <Text style={styles.ratingSub}>How was your interaction with the vehicle owner?</Text>
+          <View style={styles.starRow}>
             {[1, 2, 3, 4, 5].map((star) => (
               <TouchableOpacity key={star} onPress={() => setCustomerRating(star)}>
-                <Text style={[styles.star, star <= customerRating && styles.starActive]}>★</Text>
+                <Text style={{ fontSize: 32, opacity: star <= customerRating ? 1 : 0.3 }}>⭐</Text>
               </TouchableOpacity>
             ))}
           </View>
         </Card>
       </ScrollView>
 
-      {/* Done Button */}
+      {/* Floating Bottom Button */}
       <View style={styles.bottomBar}>
         <Button
-          title="Close Job & Return to Dashboard ✓"
+          title="Finish Job & Unlock Next Order 🏁"
           variant="primary"
           size="lg"
           loading={updateStepMutation.isPending}
@@ -124,26 +125,24 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E7EB',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
     color: '#111827',
   },
   settlementCard: {
-    padding: 20,
-    borderRadius: 14,
+    padding: 16,
     backgroundColor: '#FFFFFF',
-    marginBottom: 18,
   },
   cardHeader: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#111827',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginVertical: 4,
   },
   label: {
     fontSize: 13,
@@ -156,83 +155,56 @@ const styles = StyleSheet.create({
   },
   valueBold: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#111827',
   },
   divider: {
     height: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#E5E7EB',
     marginVertical: 10,
   },
-  payoutHighlight: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#F0FDF4',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 4,
-  },
-  payoutText: {
+  sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#166534',
-  },
-  payoutAmount: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1B5E20',
-  },
-  sectionHeader: {
-    fontSize: 15,
-    fontWeight: '700',
     color: '#111827',
+    marginTop: 20,
     marginBottom: 8,
   },
   paymentCard: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 18,
+    padding: 14,
+    backgroundColor: '#FFFFFF',
   },
-  paymentMethod: {
+  payStatusTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: '#111827',
   },
-  paymentSub: {
+  payStatusSub: {
     fontSize: 12,
     color: '#6B7280',
-    marginTop: 1,
+    marginTop: 2,
   },
   ratingCard: {
-    padding: 18,
-    borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
   },
-  ratingTitle: {
+  ratingSub: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
+    color: '#6B7280',
+    marginBottom: 12,
   },
-  starsRow: {
+  starRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 12,
-  },
-  star: {
-    fontSize: 32,
-    color: '#D1D5DB',
-  },
-  starActive: {
-    color: '#F59E0B',
   },
   bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
     padding: 16,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },

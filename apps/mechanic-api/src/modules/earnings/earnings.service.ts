@@ -97,17 +97,17 @@ export class EarningsService {
       today: {
         earningsPaise: todayEarningPaise,
         jobsCount: todayJobsCount,
-        onlineHours: 6.5,
+        onlineHours: 0,
       },
       week: {
         earningsPaise: weekEarningPaise,
         jobsCount: weekJobsCount,
-        onlineHours: 38.0,
+        onlineHours: 0,
       },
       month: {
         earningsPaise: monthEarningPaise,
         jobsCount: monthJobsCount,
-        onlineHours: 154.0,
+        onlineHours: 0,
       },
     };
   }

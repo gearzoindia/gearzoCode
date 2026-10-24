@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Badge, Button } from '@gearzo/ui';
-import { useAcceptJobOffer, useRejectJobOffer } from '@gearzo/api-client';
+import { Card, Badge, Button, LoadingScreen, EmptyState } from '@gearzo/ui';
+import { useAcceptJobOffer, useRejectJobOffer, useMechanicJobDetail } from '@gearzo/api-client';
 
 export default function IncomingJobOfferScreen() {
   const router = useRouter();
@@ -11,6 +11,7 @@ export default function IncomingJobOfferScreen() {
 
   const [countdown, setCountdown] = useState(30);
 
+  const { data: job, isLoading } = useMechanicJobDetail(offerId || '');
   const acceptMutation = useAcceptJobOffer();
   const rejectMutation = useRejectJobOffer();
 
@@ -27,29 +28,46 @@ export default function IncomingJobOfferScreen() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [router]);
 
-  const offer = {
-    id: offerId || 'job-offer-demo',
-    serviceName: 'Comprehensive 40-Point Periodic Service',
-    vehicleSummary: 'Royal Enfield Classic 350',
-    distanceKm: 2.4,
-    address: 'Villa 14, Palm Meadows, Whitefield, Bengaluru',
-    payoutPaise: 119900,
-  };
+  if (isLoading) {
+    return <LoadingScreen message="Loading Dispatch Offer..." />;
+  }
+
+  if (!job && offerId !== 'demo') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ padding: 20 }}>
+          <EmptyState
+            icon="⌛"
+            title="Offer Expired"
+            description="This dispatch offer has expired or was accepted by another partner."
+            actionTitle="Back to Dashboard"
+            onAction={() => router.replace('/(app)/(tabs)')}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const payoutPaise = job ? Math.round((job.totalAmountPaise || job.servicePricePaise || 0) * 0.9) : 0;
 
   const handleAccept = async () => {
     try {
-      await acceptMutation.mutateAsync(offer.id);
+      if (offerId) {
+        await acceptMutation.mutateAsync(offerId);
+      }
     } catch {
       // Proceed
     }
-    router.replace(`/job/${offer.id}/navigate`);
+    router.replace(`/job/${offerId}/navigate`);
   };
 
   const handleReject = async () => {
     try {
-      await rejectMutation.mutateAsync({ offerId: offer.id, reason: 'Declined by partner' });
+      if (offerId) {
+        await rejectMutation.mutateAsync({ offerId, reason: 'Declined by partner' });
+      }
     } catch {
       // Proceed
     }
@@ -59,80 +77,73 @@ export default function IncomingJobOfferScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        {/* Ring Alert Header */}
-        <View style={styles.ringPulseWrap}>
-          <View style={styles.ringPulseOuter}>
-            <View style={styles.ringPulseInner}>
-              <Text style={{ fontSize: 40 }}>⚡</Text>
-            </View>
+        {/* Urgent Header Ring */}
+        <View style={styles.topSection}>
+          <View style={styles.pulseCircle}>
+            <Text style={styles.countdownText}>{countdown}s</Text>
           </View>
-        </View>
-
-        <Text style={styles.alertTitle}>New Doorstep Job Request!</Text>
-        <Text style={styles.alertSub}>Auto-reassigns in {countdown} seconds</Text>
-
-        {/* 30s Countdown Pill */}
-        <View style={styles.timerPill}>
-          <Text style={styles.timerText}>{countdown}s</Text>
+          <Text style={styles.alertTitle}>New Nearby Job Request! 🚨</Text>
+          <Text style={styles.alertSub}>Customer waiting for doorstep service dispatch</Text>
         </View>
 
         {/* Offer Details Card */}
-        <Card variant="elevated" style={styles.card}>
-          <View style={styles.payoutRow}>
-            <View>
-              <Text style={styles.payoutLabel}>Your Net Payout</Text>
-              <Text style={styles.payoutValue}>
-                ₹{(offer.payoutPaise / 100).toLocaleString('en-IN')}
-              </Text>
-            </View>
-            <Badge label={`${offer.distanceKm} KM AWAY`} variant="info" />
+        <Card variant="elevated" style={styles.offerCard}>
+          <View style={styles.priceRow}>
+            <Text style={styles.priceLabel}>Estimated Partner Payout</Text>
+            <Text style={styles.priceValue}>
+              ₹{(payoutPaise / 100).toFixed(2)}
+            </Text>
           </View>
 
           <View style={styles.divider} />
 
           <View style={styles.detailRow}>
-            <Text style={{ fontSize: 18, marginRight: 8 }}>🔧</Text>
+            <Text style={styles.detailIcon}>🔧</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.detailLabel}>Service</Text>
-              <Text style={styles.detailValue}>{offer.serviceName}</Text>
+              <Text style={styles.detailLabel}>Required Service</Text>
+              <Text style={styles.detailValue}>{job?.serviceName || 'Periodic Service'}</Text>
             </View>
           </View>
 
           <View style={styles.detailRow}>
-            <Text style={{ fontSize: 18, marginRight: 8 }}>🛵</Text>
+            <Text style={styles.detailIcon}>🏍️</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.detailLabel}>Vehicle</Text>
-              <Text style={styles.detailValue}>{offer.vehicleSummary}</Text>
+              <Text style={styles.detailValue}>{job?.vehicleSummary || 'Vehicle Details'}</Text>
             </View>
           </View>
 
           <View style={styles.detailRow}>
-            <Text style={{ fontSize: 18, marginRight: 8 }}>📍</Text>
+            <Text style={styles.detailIcon}>📍</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.detailLabel}>Customer Location</Text>
-              <Text style={styles.detailValue}>{offer.address}</Text>
+              <Text style={styles.detailLabel}>Service Location</Text>
+              <Text style={styles.detailValue} numberOfLines={2}>
+                {job?.address || 'Customer Location'}
+              </Text>
             </View>
           </View>
         </Card>
 
-        {/* Accept / Reject Buttons */}
+        {/* Action Buttons */}
         <View style={styles.btnRow}>
-          <Button
-            title="Reject"
-            variant="danger"
-            size="lg"
-            style={{ flex: 1 }}
-            loading={rejectMutation.isPending}
-            onPress={handleReject}
-          />
-          <Button
-            title="Accept Job ✓"
-            variant="primary"
-            size="lg"
-            style={{ flex: 2, backgroundColor: '#1B5E20' }}
-            loading={acceptMutation.isPending}
-            onPress={handleAccept}
-          />
+          <View style={{ flex: 1 }}>
+            <Button
+              title="Decline ✕"
+              variant="outline"
+              size="lg"
+              loading={rejectMutation.isPending}
+              onPress={handleReject}
+            />
+          </View>
+          <View style={{ flex: 2 }}>
+            <Button
+              title="Accept Order ✓"
+              variant="primary"
+              size="lg"
+              loading={acceptMutation.isPending}
+              onPress={handleAccept}
+            />
+          </View>
         </View>
       </View>
     </SafeAreaView>
@@ -142,104 +153,93 @@ export default function IncomingJobOfferScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D3811',
+    backgroundColor: '#0F172A',
   },
   content: {
     flex: 1,
-    justifyContent: 'space-between',
     padding: 24,
-    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  ringPulseWrap: {
-    marginTop: 20,
+  topSection: {
     alignItems: 'center',
+    paddingTop: 20,
   },
-  ringPulseOuter: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringPulseInner: {
+  pulseCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E293B',
+    borderWidth: 3,
+    borderColor: '#22C55E',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 16,
+  },
+  countdownText: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#22C55E',
   },
   alertTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#FFFFFF',
-    marginTop: 16,
+    color: '#F8FAFC',
     textAlign: 'center',
   },
   alertSub: {
     fontSize: 13,
-    color: '#C8E6C9',
+    color: '#94A3B8',
     marginTop: 4,
+    textAlign: 'center',
   },
-  timerPill: {
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginTop: 10,
-  },
-  timerText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  card: {
-    width: '100%',
+  offerCard: {
     padding: 20,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E293B',
+    borderColor: '#334155',
   },
-  payoutRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  priceRow: {
     alignItems: 'center',
+    marginBottom: 12,
   },
-  payoutLabel: {
+  priceLabel: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#94A3B8',
     fontWeight: '600',
   },
-  payoutValue: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1B5E20',
+  priceValue: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#4ADE80',
+    marginTop: 4,
   },
   divider: {
     height: 1,
-    backgroundColor: '#F3F4F6',
-    marginVertical: 14,
+    backgroundColor: '#334155',
+    marginVertical: 12,
   },
   detailRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  detailIcon: {
+    fontSize: 22,
+    width: 36,
   },
   detailLabel: {
     fontSize: 11,
-    color: '#9CA3AF',
-    textTransform: 'uppercase',
+    color: '#64748B',
     fontWeight: '600',
   },
   detailValue: {
     fontSize: 14,
-    color: '#111827',
     fontWeight: '700',
-    marginTop: 2,
+    color: '#F8FAFC',
+    marginTop: 1,
   },
   btnRow: {
     flexDirection: 'row',
     gap: 12,
-    width: '100%',
+    paddingBottom: 10,
   },
 });

@@ -230,7 +230,7 @@ export class OnboardingService {
     };
   }
 
-  async submitKyc(mechanicId: string, dto: SubmitKycDto) {
+  async submitKyc(mechanicId: string, dto: any) {
     this.logger.log(`Submitting KYC documents for mechanic ${mechanicId}`);
 
     const mechanic = await (this.prisma as any).mechanic?.findUnique?.({
@@ -241,29 +241,55 @@ export class OnboardingService {
       throw new NotFoundException('Mechanic not found');
     }
 
-    // Required docs based on registration type
-    const regType = mechanic.registrationType || RegistrationType.INDIVIDUAL;
-    const requiredDocs: DocType[] = [
-      DocType.AADHAAR_FRONT,
-      DocType.AADHAAR_BACK,
-      DocType.PAN,
-      DocType.DRIVING_LICENCE,
-    ];
+    const documents: any[] = Array.isArray(dto.documents) ? [...dto.documents] : [];
 
-    if (regType === RegistrationType.SHOP) {
-      requiredDocs.push(DocType.SHOP_PHOTO);
+    if (dto.aadharNumber) {
+      const aadharLast4 = dto.aadharNumber.replace(/\D/g, '').slice(-4);
+      if (!documents.some((d) => d.docType === DocType.AADHAAR_FRONT)) {
+        documents.push({
+          docType: DocType.AADHAAR_FRONT,
+          fileKey: `kyc/${mechanicId}/aadhaar_front.jpg`,
+          numberLast4: aadharLast4,
+        });
+      }
+      if (!documents.some((d) => d.docType === DocType.AADHAAR_BACK)) {
+        documents.push({
+          docType: DocType.AADHAAR_BACK,
+          fileKey: `kyc/${mechanicId}/aadhaar_back.jpg`,
+          numberLast4: aadharLast4,
+        });
+      }
     }
 
-    const submittedTypes = new Set(dto.documents.map((d) => d.docType));
-    const missingDocs = requiredDocs.filter((r) => !submittedTypes.has(r));
+    if (dto.panNumber) {
+      const panLast4 = dto.panNumber.trim().slice(-4);
+      if (!documents.some((d) => d.docType === DocType.PAN)) {
+        documents.push({
+          docType: DocType.PAN,
+          fileKey: `kyc/${mechanicId}/pan.jpg`,
+          numberLast4: panLast4,
+        });
+      }
+    }
 
-    if (missingDocs.length > 0) {
-      throw new BadRequestException(`Missing required KYC documents: ${missingDocs.join(', ')}`);
+    if (dto.dlNumber) {
+      const dlLast4 = dto.dlNumber.trim().slice(-4);
+      if (!documents.some((d) => d.docType === DocType.DRIVING_LICENCE)) {
+        documents.push({
+          docType: DocType.DRIVING_LICENCE,
+          fileKey: `kyc/${mechanicId}/dl.jpg`,
+          numberLast4: dlLast4,
+        });
+      }
     }
 
     // Upsert documents in DB
     try {
-      for (const doc of dto.documents) {
+      for (const doc of documents) {
+        await (this.prisma as any).mechanicDocument?.deleteMany?.({
+          where: { mechanicId, docType: doc.docType },
+        });
+
         await (this.prisma as any).mechanicDocument?.create?.({
           data: {
             mechanicId,

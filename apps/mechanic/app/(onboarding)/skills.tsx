@@ -14,6 +14,8 @@ const SERVICES = [
   'Clutch & Transmission',
   'Car Detailing & Foam Wash',
   'Emergency Roadside Jumpstarts',
+  'Doorstep Tyre Puncture & Tubeless Repair',
+  'Emergency Fuel Delivery & Towing',
 ];
 
 const BRANDS = [
@@ -22,6 +24,7 @@ const BRANDS = [
 ];
 
 const EQUIPMENT = [
+  'Tubeless Puncture Kit & Portable Air Inflator',
   'Digital OBD-II Scanner',
   'Hydraulic Floor Jack & Stands',
   'Pneumatic Impact Wrench',

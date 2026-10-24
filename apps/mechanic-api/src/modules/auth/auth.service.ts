@@ -4,6 +4,8 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import * as jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SendOtpDto, VerifyOtpDto, RefreshTokenDto } from './dto/auth.dto';
 import { env } from '../../config/env';
@@ -33,16 +35,27 @@ export class AuthService {
     this.logger.log(`Verifying OTP for mechanic phone: ${dto.phone}`);
 
     const isMock = env.OTP_PROVIDER === 'mock';
-    if (isMock && dto.code !== '123456') {
+    const otpValue = dto.code || dto.otp;
+    if (isMock && otpValue !== '123456') {
       throw new BadRequestException('Invalid OTP entered');
     }
 
     let isNewUser = false;
     let mechanic: any = null;
 
+    const rawDigits = dto.phone.replace(/\D/g, '');
+    const clean10 = rawDigits.length >= 10 ? rawDigits.slice(-10) : rawDigits;
+    const phoneWithPlus91 = `+91${clean10}`;
+
     try {
-      mechanic = await (this.prisma as any).mechanic?.findUnique?.({
-        where: { phone: dto.phone },
+      mechanic = await (this.prisma as any).mechanic?.findFirst?.({
+        where: {
+          OR: [
+            { phone: dto.phone },
+            { phone: clean10 },
+            { phone: phoneWithPlus91 },
+          ],
+        },
         include: { profile: true },
       });
 
@@ -50,7 +63,7 @@ export class AuthService {
         isNewUser = true;
         mechanic = await (this.prisma as any).mechanic?.create?.({
           data: {
-            phone: dto.phone,
+            phone: phoneWithPlus91,
             status: 'PENDING_PROFILE',
           },
           include: { profile: true },
@@ -59,28 +72,52 @@ export class AuthService {
     } catch {
       // Fallback if DB connection deferred
       mechanic = {
-        id: 'mech_' + Math.random().toString(36).substring(2, 9),
-        phone: dto.phone,
+        id: randomUUID(),
+        phone: phoneWithPlus91,
         status: 'PENDING_PROFILE',
       };
       isNewUser = true;
     }
 
+    const jwtSecret = env.JWT_SECRET || 'gearzo_dev_secret_key_change_in_prod';
+    const accessToken = jwt.sign(
+      {
+        sub: mechanic.id,
+        aud: 'mechanic',
+        role: 'mechanic',
+        phone: mechanic.phone || dto.phone,
+      },
+      jwtSecret,
+      { expiresIn: '7d' }
+    );
+    const refreshToken = jwt.sign(
+      {
+        sub: mechanic.id,
+        aud: 'mechanic',
+        role: 'mechanic',
+        phone: mechanic.phone || dto.phone,
+      },
+      jwtSecret,
+      { expiresIn: '30d' }
+    );
+
     const sessionId = 'sess_mech_' + Math.random().toString(36).substring(2, 11);
-    const accessToken = 'mock_jwt_access_mech_' + (mechanic?.id || 'id');
-    const refreshToken = 'mock_jwt_refresh_mech_' + (mechanic?.id || 'id');
 
     return {
       accessToken,
       refreshToken,
+      tokens: {
+        accessToken,
+        refreshToken,
+      },
       expiresIn: 900,
       isNewUser,
       user: {
-        id: mechanic?.id,
-        phone: dto.phone,
+        id: mechanic.id,
+        phone: mechanic.phone || dto.phone,
         role: 'mechanic',
-        status: mechanic?.status || 'PENDING_PROFILE',
-        name: mechanic?.name ?? null,
+        status: mechanic.status || 'PENDING_PROFILE',
+        name: mechanic.name ?? null,
       },
       sessionId,
     };
@@ -90,9 +127,22 @@ export class AuthService {
     if (!dto.refreshToken) {
       throw new UnauthorizedException('Refresh token is required');
     }
+    const jwtSecret = env.JWT_SECRET || 'gearzo_dev_secret_key_change_in_prod';
+    const accessToken = jwt.sign(
+      {
+        aud: 'mechanic',
+        role: 'mechanic',
+      },
+      jwtSecret,
+      { expiresIn: '7d' }
+    );
     return {
-      accessToken: 'mock_jwt_access_renewed_mech_' + Date.now(),
+      accessToken,
       refreshToken: dto.refreshToken,
+      tokens: {
+        accessToken,
+        refreshToken: dto.refreshToken,
+      },
       expiresIn: 900,
     };
   }

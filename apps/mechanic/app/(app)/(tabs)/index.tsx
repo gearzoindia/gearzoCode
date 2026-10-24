@@ -76,7 +76,7 @@ export default function MechanicDashboardScreen() {
             <View>
               <Text style={styles.walletLabel}>Available Wallet Balance</Text>
               <Text style={styles.walletAmount}>
-                ₹{((earnings?.walletBalancePaise || 485000) / 100).toLocaleString('en-IN', {
+                ₹{((earnings?.walletBalancePaise || 0) / 100).toLocaleString('en-IN', {
                   minimumFractionDigits: 2,
                 })}
               </Text>
@@ -95,13 +95,13 @@ export default function MechanicDashboardScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
             <Text style={styles.statNumber}>
-              ₹{((earnings?.todayPaise || 165000) / 100).toLocaleString('en-IN')}
+              ₹{((earnings?.todayPaise || 0) / 100).toLocaleString('en-IN')}
             </Text>
             <Text style={styles.statLabel}>Today's Earnings</Text>
           </View>
 
           <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{earnings?.completedJobsCount || 3}</Text>
+            <Text style={styles.statNumber}>{earnings?.completedJobsCount || 0}</Text>
             <Text style={styles.statLabel}>Completed Jobs</Text>
           </View>
 
@@ -145,15 +145,7 @@ export default function MechanicDashboardScreen() {
                 : 'Turn toggle on to start receiving customer service requests.'}
             </Text>
 
-            {isOnline && (
-              <Button
-                title="Test Incoming Job Offer Modal 🔔"
-                variant="outline"
-                size="sm"
-                onPress={() => router.push('/job-request/job-offer-demo')}
-                style={{ marginTop: 14 }}
-              />
-            )}
+            
           </Card>
         )}
 

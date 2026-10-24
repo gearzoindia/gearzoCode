@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { Button, Input, Card } from '@gearzo/ui';
 import { useSaveMechanicKyc } from '@gearzo/api-client';
+
+interface UploadedDoc {
+  uri: string;
+  fileName: string;
+  docType: string;
+}
 
 export default function OnboardingKycScreen() {
   const router = useRouter();
@@ -11,19 +18,35 @@ export default function OnboardingKycScreen() {
   const [aadharNumber, setAadharNumber] = useState('');
   const [panNumber, setPanNumber] = useState('');
   const [dlNumber, setDlNumber] = useState('');
-  const [docsUploaded, setDocsUploaded] = useState<Record<string, boolean>>({
-    aadharFront: false,
-    aadharBack: false,
-    panCard: false,
-    drivingLicense: false,
-    selfie: false,
-  });
-
+  const [docs, setDocs] = useState<Record<string, UploadedDoc>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const saveKycMutation = useSaveMechanicKyc();
 
-  const toggleDoc = (key: string) => {
-    setDocsUploaded((prev) => ({ ...prev, [key]: !prev[key] }));
+  const pickDocument = async (key: string, docType: string) => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const fileName = asset.fileName || `${key}_${Date.now()}.jpg`;
+        setDocs((prev) => ({
+          ...prev,
+          [key]: {
+            uri: asset.uri,
+            fileName,
+            docType,
+          },
+        }));
+        setErrorMsg(null);
+      }
+    } catch (err: any) {
+      console.warn('Failed to pick document:', err);
+    }
   };
 
   const handleContinue = async () => {
@@ -39,17 +62,28 @@ export default function OnboardingKycScreen() {
       return;
     }
 
+    const documents = Object.entries(docs).map(([key, d]) => ({
+      docType: d.docType,
+      fileKey: `kyc/${key}_${Date.now()}_${d.fileName}`,
+      numberLast4: d.docType.includes('AADHAAR')
+        ? cleanAadhaar.slice(-4)
+        : d.docType === 'PAN'
+        ? cleanPan.slice(-4)
+        : undefined,
+    }));
+
     try {
       await saveKycMutation.mutateAsync({
         aadharNumber: cleanAadhaar,
         panNumber: cleanPan,
-        documentUrl: 'https://cdn.gearzo.in/docs/kyc-verified-bundle.pdf',
+        dlNumber: dlNumber.trim() || undefined,
+        documents,
       });
-    } catch {
-      // Proceed
+      router.push('/(onboarding)/bank');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to save KYC documents. Please try again.';
+      setErrorMsg(msg);
     }
-
-    router.push('/(onboarding)/bank');
   };
 
   return (
@@ -65,7 +99,7 @@ export default function OnboardingKycScreen() {
         <View>
           <Text style={styles.title}>Government Identity Proofs</Text>
           <Text style={styles.subtitle}>
-            GearZo is a secure platform. We verify all mechanics to protect customers and guarantee insurance coverage.
+            GearZo is a secure platform. Please upload your identity documents to complete partner verification.
           </Text>
 
           <View style={{ marginTop: 20 }}>
@@ -81,19 +115,31 @@ export default function OnboardingKycScreen() {
 
             <View style={styles.uploadRow}>
               <TouchableOpacity
-                style={[styles.uploadBox, docsUploaded.aadharFront && styles.uploadBoxDone]}
-                onPress={() => toggleDoc('aadharFront')}
+                style={[styles.uploadBox, docs.aadharFront && styles.uploadBoxDone]}
+                onPress={() => pickDocument('aadharFront', 'AADHAAR_FRONT')}
               >
-                <Text style={styles.uploadIcon}>{docsUploaded.aadharFront ? '✅' : '📷'}</Text>
-                <Text style={styles.uploadText}>Aadhaar Front</Text>
+                {docs.aadharFront?.uri ? (
+                  <Image source={{ uri: docs.aadharFront.uri }} style={styles.thumbImage} />
+                ) : (
+                  <Text style={styles.uploadIcon}>📷</Text>
+                )}
+                <Text style={styles.uploadText} numberOfLines={1}>
+                  {docs.aadharFront ? '✓ Aadhaar Front' : 'Upload Aadhaar Front'}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.uploadBox, docsUploaded.aadharBack && styles.uploadBoxDone]}
-                onPress={() => toggleDoc('aadharBack')}
+                style={[styles.uploadBox, docs.aadharBack && styles.uploadBoxDone]}
+                onPress={() => pickDocument('aadharBack', 'AADHAAR_BACK')}
               >
-                <Text style={styles.uploadIcon}>{docsUploaded.aadharBack ? '✅' : '📷'}</Text>
-                <Text style={styles.uploadText}>Aadhaar Back</Text>
+                {docs.aadharBack?.uri ? (
+                  <Image source={{ uri: docs.aadharBack.uri }} style={styles.thumbImage} />
+                ) : (
+                  <Text style={styles.uploadIcon}>📷</Text>
+                )}
+                <Text style={styles.uploadText} numberOfLines={1}>
+                  {docs.aadharBack ? '✓ Aadhaar Back' : 'Upload Aadhaar Back'}
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -109,19 +155,31 @@ export default function OnboardingKycScreen() {
 
             <View style={styles.uploadRow}>
               <TouchableOpacity
-                style={[styles.uploadBox, docsUploaded.panCard && styles.uploadBoxDone]}
-                onPress={() => toggleDoc('panCard')}
+                style={[styles.uploadBox, docs.panCard && styles.uploadBoxDone]}
+                onPress={() => pickDocument('panCard', 'PAN')}
               >
-                <Text style={styles.uploadIcon}>{docsUploaded.panCard ? '✅' : '📷'}</Text>
-                <Text style={styles.uploadText}>PAN Card Photo</Text>
+                {docs.panCard?.uri ? (
+                  <Image source={{ uri: docs.panCard.uri }} style={styles.thumbImage} />
+                ) : (
+                  <Text style={styles.uploadIcon}>📷</Text>
+                )}
+                <Text style={styles.uploadText} numberOfLines={1}>
+                  {docs.panCard ? '✓ PAN Card' : 'Upload PAN Card'}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.uploadBox, docsUploaded.selfie && styles.uploadBoxDone]}
-                onPress={() => toggleDoc('selfie')}
+                style={[styles.uploadBox, docs.selfie && styles.uploadBoxDone]}
+                onPress={() => pickDocument('selfie', 'SELFIE_WITH_ID')}
               >
-                <Text style={styles.uploadIcon}>{docsUploaded.selfie ? '✅' : '🤳'}</Text>
-                <Text style={styles.uploadText}>Live Selfie (KYC)</Text>
+                {docs.selfie?.uri ? (
+                  <Image source={{ uri: docs.selfie.uri }} style={styles.thumbImage} />
+                ) : (
+                  <Text style={styles.uploadIcon}>🤳</Text>
+                )}
+                <Text style={styles.uploadText} numberOfLines={1}>
+                  {docs.selfie ? '✓ Live Selfie' : 'Upload Live Selfie'}
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -133,6 +191,20 @@ export default function OnboardingKycScreen() {
               value={dlNumber}
               onChangeText={setDlNumber}
             />
+
+            <TouchableOpacity
+              style={[styles.uploadBox, styles.dlUploadBox, docs.drivingLicense && styles.uploadBoxDone]}
+              onPress={() => pickDocument('drivingLicense', 'DRIVING_LICENCE')}
+            >
+              {docs.drivingLicense?.uri ? (
+                <Image source={{ uri: docs.drivingLicense.uri }} style={styles.thumbImage} />
+              ) : (
+                <Text style={styles.uploadIcon}>🪪</Text>
+              )}
+              <Text style={styles.uploadText} numberOfLines={1}>
+                {docs.drivingLicense ? '✓ Driving License Uploaded' : 'Upload Driving License Photo (Optional)'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {errorMsg && <Text style={styles.errorText}>{errorMsg}</Text>}
@@ -198,6 +270,7 @@ const styles = StyleSheet.create({
   uploadBox: {
     flex: 1,
     paddingVertical: 14,
+    paddingHorizontal: 8,
     borderRadius: 10,
     borderWidth: 1.5,
     borderStyle: 'dashed',
@@ -205,6 +278,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 80,
+  },
+  dlUploadBox: {
+    marginBottom: 16,
   },
   uploadBoxDone: {
     borderColor: '#1B5E20',
@@ -212,17 +289,25 @@ const styles = StyleSheet.create({
     borderStyle: 'solid',
   },
   uploadIcon: {
-    fontSize: 22,
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  thumbImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
     marginBottom: 4,
   },
   uploadText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#374151',
+    textAlign: 'center',
   },
   errorText: {
     color: '#DC2626',
     fontSize: 13,
     marginTop: 10,
+    fontWeight: '500',
   },
 });

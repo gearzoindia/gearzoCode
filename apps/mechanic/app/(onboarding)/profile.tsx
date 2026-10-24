@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Input, Card } from '@gearzo/ui';
@@ -17,7 +18,7 @@ export default function OnboardingProfileScreen() {
   const [experienceYears, setExperienceYears] = useState('5');
   const [dob, setDob] = useState('1994-05-15');
   const [selectedLangs, setSelectedLangs] = useState<string[]>(['Hindi', 'English']);
-  const [photoAdded, setPhotoAdded] = useState(false);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const saveProfileMutation = useSaveMechanicProfile();
@@ -71,18 +72,36 @@ export default function OnboardingProfileScreen() {
             Tell us about your background and automotive repair expertise.
           </Text>
 
-          {/* Photo Picker Simulator */}
+          {/* Real Photo Picker */}
           <TouchableOpacity
-            style={styles.photoPicker}
-            onPress={() => setPhotoAdded(!photoAdded)}
+            style={[styles.photoPicker, photoUri ? { borderColor: '#1B5E20', backgroundColor: '#F0FDF4' } : null]}
+            onPress={async () => {
+              try {
+                const res = await ImagePicker.launchImageLibraryAsync({
+                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                  allowsEditing: true,
+                  aspect: [1, 1],
+                  quality: 0.8,
+                });
+                if (!res.canceled && res.assets && res.assets.length > 0) {
+                  setPhotoUri(res.assets[0].uri);
+                }
+              } catch (e) {
+                console.warn('Image picker error:', e);
+              }
+            }}
             accessibilityRole="button"
           >
             <View style={styles.avatarCircle}>
-              <Text style={{ fontSize: 32 }}>{photoAdded ? '👨‍🔧' : '📷'}</Text>
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} style={{ width: 56, height: 56, borderRadius: 28 }} />
+              ) : (
+                <Text style={{ fontSize: 32 }}>📷</Text>
+              )}
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={styles.photoTitle}>
-                {photoAdded ? 'Profile Photo Added ✓' : 'Upload Profile Photo'}
+                {photoUri ? 'Profile Photo Selected ✓' : 'Upload Profile Photo'}
               </Text>
               <Text style={styles.photoSub}>A clear headshot builds high trust with customers</Text>
             </View>
