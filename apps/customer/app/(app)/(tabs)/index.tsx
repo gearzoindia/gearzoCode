@@ -86,7 +86,12 @@ export default function CustomerHomeScreen() {
         {primaryVehicle ? (
           <TouchableOpacity
             style={styles.vehicleCard}
-            onPress={() => router.push('/vehicles/add')}
+            onPress={() =>
+              router.push({
+                pathname: '/services',
+                params: { vehicleType: primaryVehicle.type, vehicleId: primaryVehicle.id },
+              })
+            }
             activeOpacity={0.9}
           >
             <View style={styles.vehicleIconBox}>
@@ -109,7 +114,7 @@ export default function CustomerHomeScreen() {
                 </View>
               </View>
             </View>
-            <Text style={styles.vehicleDropdownArrow}>▼</Text>
+            <Text style={styles.vehicleDropdownArrow}>→</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -129,6 +134,40 @@ export default function CustomerHomeScreen() {
             <Text style={styles.vehicleDropdownArrow}>→</Text>
           </TouchableOpacity>
         )}
+
+        {/* Other saved vehicles: tap to see services for that vehicle */}
+        {primaryVehicle ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 4 }}
+          >
+            {vehicleList
+              .filter((v) => v.id !== primaryVehicle.id)
+              .map((v) => (
+                <TouchableOpacity
+                  key={v.id}
+                  style={styles.vehicleChip}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/services',
+                      params: { vehicleType: v.type, vehicleId: v.id },
+                    })
+                  }
+                >
+                  <Text style={styles.vehicleChipText}>
+                    {v.type === 'FOUR_WHEELER' ? '🚗' : '🏍️'} {v.brand ? `${v.brand} ` : ''}{v.model}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            <TouchableOpacity
+              style={[styles.vehicleChip, styles.vehicleChipAdd]}
+              onPress={() => router.push('/vehicles/add')}
+            >
+              <Text style={[styles.vehicleChipText, { color: '#16A34A' }]}>+ Add Vehicle</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        ) : null}
 
         {/* 4. First Booking Promo Card (Screen 1) */}
         <View style={styles.bodyWrap}>
@@ -264,6 +303,23 @@ export default function CustomerHomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  vehicleChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E3EAE5',
+  },
+  vehicleChipAdd: {
+    borderStyle: 'dashed',
+    borderColor: '#16A34A',
+  },
+  vehicleChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F1F16',
+  },
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',

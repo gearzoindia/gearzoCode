@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -17,13 +17,20 @@ import { useCartStore, CartItem } from '../../../stores/cart-store';
 
 export default function ServicesListScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ categoryId?: string; vehicleType?: string }>();
+  const params = useLocalSearchParams<{ categoryId?: string; vehicleType?: string; vehicleId?: string }>();
 
   const [vehicleType, setVehicleType] = useState<'TWO_WHEELER' | 'FOUR_WHEELER'>(
     (params.vehicleType as any) === 'FOUR_WHEELER' ? 'FOUR_WHEELER' : 'TWO_WHEELER'
   );
 
   // 3 tabs: Book a Mechanic, Service Packages, Specific Repair
+  // Keep vehicle type in sync when navigating here from a specific saved vehicle
+  useEffect(() => {
+    if (params.vehicleType === 'FOUR_WHEELER' || params.vehicleType === 'TWO_WHEELER') {
+      setVehicleType(params.vehicleType);
+    }
+  }, [params.vehicleType, params.vehicleId]);
+
   const [activeTab, setActiveTab] = useState<'Book a Mechanic' | 'Service Packages' | 'Specific Repair'>(
     'Book a Mechanic'
   );
@@ -57,6 +64,10 @@ export default function ServicesListScreen() {
 
   const vehicleList = Array.isArray(vehicles) ? vehicles : [];
   const activeVehicle =
+    (params.vehicleId
+      ? vehicleList.find((v) => v.id === params.vehicleId && v.type === vehicleType)
+      : undefined) ||
+    vehicleList.find((v) => v.isDefault && v.type === vehicleType) ||
     vehicleList.find((v) => (v.type === vehicleType)) ||
     vehicleList[0] ||
     null;

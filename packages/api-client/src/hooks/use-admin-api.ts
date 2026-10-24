@@ -198,6 +198,32 @@ export function useAdminMechanics(search?: string) {
   });
 }
 
+
+export function useAdminCreateMechanic() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      name: string;
+      phone: string;
+      registrationType?: 'INDIVIDUAL' | 'SHOP' | 'DIRECT_JOB';
+      shopName?: string;
+      experienceYears?: number;
+      serviceRadiusKm?: number;
+      vehicleTypes?: string[];
+      status?: 'APPROVED' | 'PENDING_KYC' | 'UNDER_REVIEW';
+      areaId?: string;
+    }) => {
+      const res = await adminApi.post('/admin/mechanics', payload);
+      return (res.data as any)?.data || res.data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'mechanics'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'kyc-queue'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
+    },
+  });
+}
+
 export function useAdminMechanicDetail(mechanicId: string) {
   return useQuery({
     queryKey: ['admin', 'mechanics', mechanicId],

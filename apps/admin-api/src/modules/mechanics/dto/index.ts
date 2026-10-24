@@ -59,11 +59,27 @@ export class ReviewDocumentItemDto {
 }
 
 export class ReviewKycDto {
-  @ApiProperty({ type: [ReviewDocumentItemDto] })
+  @ApiPropertyOptional({ type: [ReviewDocumentItemDto] })
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ReviewDocumentItemDto)
-  documents!: ReviewDocumentItemDto[];
+  documents?: ReviewDocumentItemDto[];
+
+  @ApiPropertyOptional({ enum: ['VERIFIED', 'APPROVED', 'REJECTED'], description: 'Overall mechanic verification status' })
+  @IsOptional()
+  @IsString()
+  status?: 'VERIFIED' | 'APPROVED' | 'REJECTED';
+
+  @ApiPropertyOptional({ description: 'Auditor review notes' })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @ApiPropertyOptional({ description: 'Optional rejection reason' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
 
   @ApiPropertyOptional({ description: 'Approve background declaration if applicable' })
   @IsOptional()
@@ -82,4 +98,51 @@ export class SuspendMechanicDto {
   @IsNumber()
   @Min(1)
   durationDays?: number;
+}
+
+export class CreateMechanicDto {
+  @ApiProperty({ description: 'Mechanic full name', example: 'Rajesh Kumar' })
+  @IsString()
+  name!: string;
+
+  @ApiProperty({ description: 'Mechanic mobile number', example: '+919876543210' })
+  @IsString()
+  phone!: string;
+
+  @ApiPropertyOptional({ enum: ['INDIVIDUAL', 'SHOP', 'DIRECT_JOB'], default: 'INDIVIDUAL' })
+  @IsOptional()
+  @IsString()
+  registrationType?: 'INDIVIDUAL' | 'SHOP' | 'DIRECT_JOB' = 'INDIVIDUAL';
+
+  @ApiPropertyOptional({ description: 'Workshop / Garage name' })
+  @IsOptional()
+  @IsString()
+  shopName?: string;
+
+  @ApiPropertyOptional({ description: 'Years of professional experience', default: 3 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  experienceYears?: number = 3;
+
+  @ApiPropertyOptional({ description: 'Service radius in km', default: 10 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  serviceRadiusKm?: number = 10;
+
+  @ApiPropertyOptional({ description: 'Vehicle types serviced', example: ['TWO_WHEELER'] })
+  @IsOptional()
+  @IsArray()
+  vehicleTypes?: string[] = ['TWO_WHEELER'];
+
+  @ApiPropertyOptional({ enum: MechanicStatus, default: MechanicStatus.APPROVED })
+  @IsOptional()
+  @IsEnum(MechanicStatus)
+  status?: MechanicStatus = MechanicStatus.APPROVED;
+
+  @ApiPropertyOptional({ description: 'Area jurisdiction UUID' })
+  @IsOptional()
+  @IsUUID()
+  areaId?: string;
 }

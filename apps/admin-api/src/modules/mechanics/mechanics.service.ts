@@ -3,12 +3,14 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { SessionService } from '@gearzo/auth';
 import {
   QueryMechanicsDto,
+  CreateMechanicDto,
   ReviewKycDto,
   SuspendMechanicDto,
 } from './dto';
@@ -18,6 +20,9 @@ import {
   DocStatus,
   ApprovalRequestType,
   BackgroundReviewStatus,
+  RegistrationType,
+  PresenceStatus,
+  VehicleType,
   Prisma,
 } from '@gearzo/db';
 
@@ -28,6 +33,97 @@ export class MechanicsService {
     private readonly audit: AuditService,
     private readonly sessionService: SessionService,
   ) {}
+
+  async create(
+    dto: CreateMechanicDto,
+    admin: AuthenticatedAdmin,
+    scope: JurisdictionScopeContext,
+  ) {
+    let cleanPhone = dto.phone.replace(/[\s-]/g, '');
+    if (!cleanPhone.startsWith('+')) {
+      if (cleanPhone.length === 10) {
+        cleanPhone = '+91' + cleanPhone;
+      } else {
+        cleanPhone = '+' + cleanPhone;
+      }
+    }
+
+    const existing = await this.prisma.mechanic.findUnique({
+      where: { phone: cleanPhone },
+    });
+    if (existing) {
+      throw new ConflictException(`Mechanic with phone ${cleanPhone} is already registered`);
+    }
+
+    const regType = (dto.registrationType as RegistrationType) || RegistrationType.INDIVIDUAL;
+    const status = dto.status || MechanicStatus.APPROVED;
+
+    // Resolve areaId if not provided
+    let areaId = dto.areaId;
+    if (!areaId && scope?.subtreeIds?.length > 0) {
+      areaId = scope.subtreeIds[0];
+    }
+    if (!areaId) {
+      const defaultArea = await this.prisma.jurisdiction.findFirst();
+      areaId = defaultArea?.id;
+    }
+
+    const created = await this.prisma.mechanic.create({
+      data: {
+        phone: cleanPhone,
+        name: dto.name.trim(),
+        registrationType: regType,
+        status,
+        areaId,
+        profile: {
+          create: {
+            registrationType: regType,
+            shopName: dto.shopName?.trim() || null,
+            experienceYears: dto.experienceYears || 2,
+            serviceRadiusKm: dto.serviceRadiusKm || 10,
+            ratingAvg: 5.0,
+            ratingCount: 1,
+            languages: ['English', 'Hindi'],
+            serviceModes: ['DOORSTEP', 'GARAGE_VISIT'],
+          },
+        },
+        presence: {
+          create: {
+            status: PresenceStatus.OFFLINE,
+          },
+        },
+      },
+      include: {
+        profile: true,
+        presence: true,
+        area: true,
+      },
+    });
+
+    if (Array.isArray(dto.vehicleTypes) && dto.vehicleTypes.length > 0) {
+      for (const vt of dto.vehicleTypes) {
+        await this.prisma.mechanicVehicleType.create({
+          data: {
+            mechanicId: created.id,
+            vehicleType: vt as VehicleType,
+          },
+        });
+      }
+    }
+
+    try {
+      await this.audit.log({
+        actorId: admin.id,
+        action: 'MECHANIC_CREATE',
+        entity: 'Mechanic',
+        entityId: created.id,
+        after: created,
+        reason: 'Registered mechanic from Admin Portal',
+      });
+    } catch {}
+
+    return created;
+  }
 
   async findAll(dto: QueryMechanicsDto, scope: JurisdictionScopeContext) {
     const page = dto.page || 1;
@@ -214,16 +310,18 @@ export class MechanicsService {
     const now = new Date();
 
     await this.prisma.$transaction(async (tx) => {
-      for (const doc of dto.documents) {
-        await tx.mechanicDocument.update({
-          where: { id: doc.docId },
-          data: {
-            status: doc.status as DocStatus,
-            rejectionReason: doc.status === 'REJECTED_DOC' ? doc.rejectionReason : null,
-            reviewedById: admin.id,
-            reviewedAt: now,
-          },
-        });
+      if (Array.isArray(dto.documents) && dto.documents.length > 0) {
+        for (const doc of dto.documents) {
+          await tx.mechanicDocument.update({
+            where: { id: doc.docId },
+            data: {
+              status: doc.status as DocStatus,
+              rejectionReason: doc.status === 'REJECTED_DOC' ? doc.rejectionReason : null,
+              reviewedById: admin.id,
+              reviewedAt: now,
+            },
+          });
+        }
       }
 
       if (dto.backgroundStatus && mechanic.backgroundDeclarations.length > 0) {
@@ -239,17 +337,45 @@ export class MechanicsService {
       }
 
       // Check overall verification
-      const allDocs = await tx.mechanicDocument.findMany({ where: { mechanicId: id } });
-      const hasRejection = allDocs.some((d) => d.status === DocStatus.REJECTED_DOC);
-      const allApproved = allDocs.length > 0 && allDocs.every((d) => d.status === DocStatus.APPROVED_DOC);
-
       let nextStatus = mechanic.status;
-      if (hasRejection) {
-        nextStatus = MechanicStatus.REJECTED;
-      } else if (allApproved) {
+
+      if (dto.status === 'VERIFIED' || dto.status === 'APPROVED') {
         nextStatus = MechanicStatus.APPROVED;
+        if (mechanic.documents && mechanic.documents.length > 0) {
+          await tx.mechanicDocument.updateMany({
+            where: { mechanicId: id },
+            data: {
+              status: DocStatus.APPROVED_DOC,
+              reviewedById: admin.id,
+              reviewedAt: now,
+            },
+          });
+        }
+      } else if (dto.status === 'REJECTED') {
+        nextStatus = MechanicStatus.REJECTED;
+        if (mechanic.documents && mechanic.documents.length > 0) {
+          await tx.mechanicDocument.updateMany({
+            where: { mechanicId: id },
+            data: {
+              status: DocStatus.REJECTED_DOC,
+              rejectionReason: dto.notes || dto.reason || 'Rejected by auditor',
+              reviewedById: admin.id,
+              reviewedAt: now,
+            },
+          });
+        }
       } else {
-        nextStatus = MechanicStatus.UNDER_REVIEW;
+        const allDocs = await tx.mechanicDocument.findMany({ where: { mechanicId: id } });
+        const hasRejection = allDocs.some((d) => d.status === DocStatus.REJECTED_DOC);
+        const allApproved = allDocs.length > 0 && allDocs.every((d) => d.status === DocStatus.APPROVED_DOC);
+
+        if (hasRejection) {
+          nextStatus = MechanicStatus.REJECTED;
+        } else if (allApproved) {
+          nextStatus = MechanicStatus.APPROVED;
+        } else {
+          nextStatus = MechanicStatus.UNDER_REVIEW;
+        }
       }
 
       await tx.mechanic.update({

@@ -75,7 +75,7 @@ export default function AddVehicleScreen() {
     }
 
     try {
-      await addVehicleMutation.mutateAsync({
+      const saved: any = await addVehicleMutation.mutateAsync({
         type,
         brand,
         model: model.trim(),
@@ -84,7 +84,15 @@ export default function AddVehicleScreen() {
         year,
         isDefault,
       });
-      router.back();
+      const savedVehicle = saved?.data ?? saved;
+      // Take the customer straight to the services available for the vehicle just saved
+      router.replace({
+        pathname: '/services',
+        params: {
+          vehicleType: savedVehicle?.type || type,
+          ...(savedVehicle?.id ? { vehicleId: savedVehicle.id } : {}),
+        },
+      });
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
       setErrorMsg(error?.response?.data?.message || 'Failed to add vehicle. Please try again.');

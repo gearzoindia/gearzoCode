@@ -12,6 +12,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MechanicsService } from './mechanics.service';
 import {
   QueryMechanicsDto,
+  CreateMechanicDto,
   ReviewKycDto,
   SuspendMechanicDto,
 } from './dto';
@@ -25,6 +26,18 @@ import { Request } from 'express';
 @Controller('mechanics')
 export class MechanicsController {
   constructor(private readonly mechanicsService: MechanicsService) {}
+
+  @Post()
+  @Permissions('MECHANIC_VIEW')
+  @ApiOperation({ summary: 'Register a new mechanic partner directly from admin' })
+  async create(
+    @Body() dto: CreateMechanicDto,
+    @CurrentAdmin() admin: AuthenticatedAdmin,
+    @Req() req: Request,
+  ) {
+    const scope = (req as any).jurisdictionScope;
+    return this.mechanicsService.create(dto, admin, scope);
+  }
 
   @Get()
   @Permissions('MECHANIC_VIEW')
