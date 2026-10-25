@@ -1,104 +1,56 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button } from '@gearzo/ui';
+import { GearzoSplashLogin } from '@gearzo/ui';
+import { useCustomerSendOtp } from '@gearzo/api-client';
+import { phoneSchema } from '@gearzo/schemas';
 
-export default function WelcomeScreen() {
+export default function CustomerWelcomeScreen() {
   const router = useRouter();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const sendOtpMutation = useCustomerSendOtp();
+
+  const handleContinue = async (rawDigits: string) => {
+    setErrorMessage(null);
+    const cleanedDigits = rawDigits.trim().replace(/\D/g, '');
+    const fullPhone = `+91${cleanedDigits}`;
+
+    const validation = phoneSchema.safeParse(fullPhone);
+    if (!validation.success) {
+      const msg = validation.error.errors[0]?.message || 'Please enter a valid 10-digit Indian phone number';
+      setErrorMessage(msg);
+      throw new Error(msg);
+    }
+
+    try {
+      await sendOtpMutation.mutateAsync({ phone: fullPhone });
+      router.push({
+        pathname: '/(auth)/otp',
+        params: { phone: fullPhone },
+      });
+    } catch (err: unknown) {
+      const error = err as { response?: { status?: number; data?: { message?: string } } };
+      let msg = 'Failed to send OTP. Please try again.';
+      if (error?.response?.status === 429) {
+        msg = 'Too many OTP attempts. Please wait a few minutes before trying again.';
+      } else if (error?.response?.data?.message) {
+        msg = error.response.data.message;
+      }
+      setErrorMessage(msg);
+      throw err;
+    }
+  };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#1B5E20' }}>
-      <View style={{ flex: 1, justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 32 }}>
-        {/* Top spacer */}
-        <View />
-
-        {/* Center brand logo and tagline */}
-        <View style={{ alignItems: 'center' }}>
-          <View
-            style={{
-              width: 96,
-              height: 96,
-              borderRadius: 24,
-              backgroundColor: '#FFFFFF',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 20,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.2,
-              shadowRadius: 8,
-              elevation: 6,
-            }}
-          >
-            <Text style={{ fontSize: 48 }}>⚙️</Text>
-          </View>
-          <Text
-            style={{
-              fontSize: 36,
-              fontWeight: '800',
-              color: '#FFFFFF',
-              letterSpacing: 1,
-              marginBottom: 8,
-            }}
-          >
-            GearZo
-          </Text>
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: '500',
-              color: '#A5D6A7',
-              letterSpacing: 0.5,
-            }}
-          >
-            Mechanic in Minutes
-          </Text>
-          <Text
-            style={{
-              fontSize: 14,
-              color: '#E8F5E9',
-              textAlign: 'center',
-              marginTop: 12,
-              maxWidth: 280,
-              lineHeight: 20,
-            }}
-          >
-            On-demand doorstep vehicle servicing, maintenance, and emergency roadside repairs
-          </Text>
-        </View>
-
-        {/* Bottom actions & links */}
-        <View style={{ width: '100%' }}>
-          <Button
-            title="Continue with Mobile Number"
-            variant="secondary"
-            size="lg"
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: 12,
-              marginBottom: 16,
-            }}
-            textStyle={{ color: '#1B5E20', fontWeight: '700' }}
-            onPress={() => router.push('/(auth)/phone')}
-          />
-
-          <View style={{ flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Text style={{ fontSize: 12, color: '#C8E6C9' }}>By continuing, you agree to our </Text>
-            <TouchableOpacity onPress={() => router.push('/(app)/profile/legal')}>
-              <Text style={{ fontSize: 12, color: '#FFFFFF', textDecorationLine: 'underline', fontWeight: '600' }}>
-                Terms
-              </Text>
-            </TouchableOpacity>
-            <Text style={{ fontSize: 12, color: '#C8E6C9' }}> & </Text>
-            <TouchableOpacity onPress={() => router.push('/(app)/profile/legal')}>
-              <Text style={{ fontSize: 12, color: '#FFFFFF', textDecorationLine: 'underline', fontWeight: '600' }}>
-                Privacy Policy
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </SafeAreaView>
+    <GearzoSplashLogin
+      appType="customer"
+      title="Welcome to Gearzo"
+      subtitle="Your journey deserves a reliable mechanic."
+      tagline="Mechanic, Minutes Away."
+      onContinue={handleContinue}
+      isLoading={sendOtpMutation.isPending}
+      errorMessage={errorMessage}
+      onTermsPress={() => router.push('/(app)/profile/legal')}
+      onPrivacyPress={() => router.push('/(app)/profile/legal')}
+    />
   );
 }
