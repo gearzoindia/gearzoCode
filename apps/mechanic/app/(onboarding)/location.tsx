@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Input, Card } from '@gearzo/ui';
+import * as Location from 'expo-location';
+import { Button, Input, GearzoMap, reverseGeocodeGoogle } from '@gearzo/ui';
 import { useSaveMechanicLocation } from '@gearzo/api-client';
 
 const RADIUS_OPTIONS = [3, 5, 10, 15];
@@ -11,18 +12,67 @@ export default function OnboardingLocationScreen() {
   const router = useRouter();
 
   const [address, setAddress] = useState(
-    'Shop No. 12, 100 Feet Road, Indiranagar, Bengaluru, Karnataka 560038'
+    'Shop No. 12, 100 Feet Road, Madhapur, Hyderabad, Telangana 500081'
   );
+  const [coords, setCoords] = useState({ latitude: 17.4485, longitude: 78.3908 });
   const [radiusKm, setRadiusKm] = useState<number>(5);
 
   const saveLocationMutation = useSaveMechanicLocation();
+
+  const handleSelectCoord = async (newCoord: { latitude: number; longitude: number }) => {
+    setCoords(newCoord);
+    const geo = await reverseGeocodeGoogle(newCoord.latitude, newCoord.longitude);
+    if (geo && geo.formattedAddress) {
+      setAddress(geo.formattedAddress);
+      return;
+    }
+    try {
+      const nativeGeo = await Location.reverseGeocodeAsync(newCoord);
+      if (nativeGeo && nativeGeo.length > 0) {
+        const g = nativeGeo[0];
+        const formatted = [g.name, g.street, g.district, g.city, g.region, g.postalCode]
+          .filter(Boolean)
+          .join(', ');
+        if (formatted) setAddress(formatted);
+      }
+    } catch {
+      // Ignore fallback error
+    }
+  };
+
+  const handleUseCurrentGps = async (silent = false) => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        if (!silent) {
+          Alert.alert('Permission Needed', 'Please allow location permission to set your workshop base.');
+        }
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      await handleSelectCoord({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+      });
+    } catch {
+      if (!silent) {
+        Alert.alert('GPS Notice', 'Tap anywhere on the Google Map to position your workshop pin.');
+      }
+    }
+  };
+
+  useEffect(() => {
+    handleUseCurrentGps(true);
+  }, []);
 
   const handleContinue = async () => {
     try {
       await saveLocationMutation.mutateAsync({
         address,
-        latitude: 12.9716,
-        longitude: 77.5946,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
         radiusKm,
       });
     } catch {
@@ -31,6 +81,8 @@ export default function OnboardingLocationScreen() {
 
     router.push('/(onboarding)/kyc');
   };
+
+  const zoomDelta = radiusKm <= 3 ? 0.06 : radiusKm <= 5 ? 0.1 : radiusKm <= 10 ? 0.2 : 0.3;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -45,16 +97,33 @@ export default function OnboardingLocationScreen() {
         <View>
           <Text style={styles.title}>Service Operating Area</Text>
           <Text style={styles.subtitle}>
-            Set your garage or home base. You will only receive job dispatch offers within your selected operating radius.
+            Set your garage or home base on Google Maps. You will receive job dispatch offers within your selected operating radius.
           </Text>
 
-          {/* Map Simulation Box */}
+          {/* Interactive Google Map with Service Radius Circle */}
           <View style={styles.mapBox}>
-            <View style={[styles.radiusCircle, { width: radiusKm * 20, height: radiusKm * 20 }]}>
-              <View style={styles.pin}>
-                <Text style={{ fontSize: 24 }}>📍</Text>
-              </View>
-            </View>
+            <GearzoMap
+              latitude={coords.latitude}
+              longitude={coords.longitude}
+              zoomDelta={zoomDelta}
+              radiusMeters={radiusKm * 1000}
+              onLocationSelect={handleSelectCoord}
+              style={StyleSheet.absoluteFillObject}
+              markers={[
+                {
+                  id: 'selected',
+                  latitude: coords.latitude,
+                  longitude: coords.longitude,
+                  title: 'Workshop / Base Location',
+                  badgeText: `${radiusKm} km Zone`,
+                  iconText: '🔧',
+                  color: '#1B5E20',
+                },
+              ]}
+            />
+            <TouchableOpacity style={styles.gpsFloatingBtn} onPress={() => handleUseCurrentGps(false)}>
+              <Text style={styles.gpsBtnText}>🎯 Use GPS</Text>
+            </TouchableOpacity>
             <View style={styles.mapWatermark}>
               <Text style={styles.mapWatermarkText}>Operating Radius: {radiusKm} km</Text>
             </View>
@@ -145,32 +214,37 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   mapBox: {
-    height: 180,
+    height: 220,
     backgroundColor: '#E2E8F0',
     borderRadius: 14,
     marginTop: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
     position: 'relative',
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
   },
-  radiusCircle: {
-    borderRadius: 999,
-    borderWidth: 2,
+  gpsFloatingBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
     borderColor: '#1B5E20',
-    backgroundColor: 'rgba(27, 94, 32, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    elevation: 3,
   },
-  pin: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  gpsBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1B5E20',
   },
   mapWatermark: {
     position: 'absolute',
     bottom: 8,
     right: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,

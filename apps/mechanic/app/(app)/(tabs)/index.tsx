@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,14 +10,68 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Location from 'expo-location';
 import { useAuth, useToggleDuty, useMechanicEarnings, useMechanicJobs } from '@gearzo/api-client';
-import { Card, Badge, Button, BookingCard } from '@gearzo/ui';
+import { Card, Badge, Button, BookingCard, reverseGeocodeGoogle } from '@gearzo/ui';
 
 export default function MechanicDashboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
 
   const [isOnline, setIsOnline] = useState(true);
+  const [liveLocationLabel, setLiveLocationLabel] = useState<string>('Detecting GPS...');
+
+  useEffect(() => {
+    let subscription: Location.LocationSubscription | null = null;
+    let mounted = true;
+
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted' || !mounted) {
+          if (mounted) setLiveLocationLabel('Location permission required');
+          return;
+        }
+
+        const initial = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (!mounted) return;
+
+        const geo = await reverseGeocodeGoogle(initial.coords.latitude, initial.coords.longitude);
+        if (mounted && geo && (geo.area || geo.city)) {
+          setLiveLocationLabel([geo.area, geo.city].filter(Boolean).join(', '));
+        } else {
+          setLiveLocationLabel(
+            `${initial.coords.latitude.toFixed(4)}, ${initial.coords.longitude.toFixed(4)}`
+          );
+        }
+
+        subscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            distanceInterval: 50,
+          },
+          async (pos) => {
+            if (!mounted) return;
+            const g = await reverseGeocodeGoogle(pos.coords.latitude, pos.coords.longitude);
+            if (mounted && g && (g.area || g.city)) {
+              setLiveLocationLabel([g.area, g.city].filter(Boolean).join(', '));
+            }
+          }
+        );
+      } catch {
+        if (mounted) setLiveLocationLabel('GPS Active');
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      if (subscription) {
+        subscription.remove();
+      }
+    };
+  }, [isOnline]);
 
   const toggleDutyMutation = useToggleDuty();
   const { data: earnings, refetch: refetchEarnings, isRefetching } = useMechanicEarnings();
@@ -49,7 +103,7 @@ export default function MechanicDashboardScreen() {
           <View style={styles.statusRow}>
             <View style={[styles.statusDot, isOnline ? styles.dotOnline : styles.dotOffline]} />
             <Text style={styles.statusLabel}>
-              {isOnline ? 'Online (Accepting Jobs)' : 'Offline (Paused)'}
+              {isOnline ? `Online · 📍 ${liveLocationLabel}` : 'Offline (Paused)'}
             </Text>
           </View>
         </View>

@@ -14,5 +14,7 @@ export * from './ServiceCard';
 export * from './BookingCard';
 export * from './VehicleCard';
 export * from './GearzoSplashLogin';
-export * from './GearzoSplashLogin';
+export * from './assets/GearzoSvgs';
+export * from './GearzoMap';
+
 

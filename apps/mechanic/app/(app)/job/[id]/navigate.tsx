@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Card, LoadingScreen } from '@gearzo/ui';
+import * as Location from 'expo-location';
+import { Button, Card, LoadingScreen, GearzoMap } from '@gearzo/ui';
 import { useUpdateJobStep, useMechanicJobDetail } from '@gearzo/api-client';
 
 export default function MechanicNavigateScreen() {
@@ -12,13 +13,57 @@ export default function MechanicNavigateScreen() {
   const { data: job, isLoading } = useMechanicJobDetail(id || '');
   const updateStepMutation = useUpdateJobStep();
 
+  const destLat = Number(job?.latitude || 17.4485);
+  const destLng = Number(job?.longitude || 78.3908);
+  const [mechCoords, setMechCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
+    let mounted = true;
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted' || !mounted) return;
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (mounted) {
+          setMechCoords({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+        }
+        sub = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, distanceInterval: 20 },
+          (loc) => {
+            if (mounted) {
+              setMechCoords({
+                latitude: loc.coords.latitude,
+                longitude: loc.coords.longitude,
+              });
+            }
+          }
+        );
+      } catch {
+        // Fallback to simulated offset
+      }
+    })();
+    return () => {
+      mounted = false;
+      if (sub) sub.remove();
+    };
+  }, []);
+
+  const mechLat = mechCoords?.latitude ?? destLat - 0.008;
+  const mechLng = mechCoords?.longitude ?? destLng - 0.011;
+
   const handleOpenGoogleMaps = () => {
     if (job?.latitude && job?.longitude) {
-      Linking.openURL(`https://maps.google.com/?q=${job.latitude},${job.longitude}`);
+      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${job.latitude},${job.longitude}`);
     } else if (job?.address) {
-      Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(job.address)}`);
+      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`);
     } else {
-      Linking.openURL('https://maps.google.com');
+      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`);
     }
   };
 
@@ -58,11 +103,39 @@ export default function MechanicNavigateScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Map Canvas */}
+      {/* Live Google Map Canvas */}
       <View style={styles.mapCanvas}>
-        <View style={styles.routeOverlay}>
-          <Text style={{ fontSize: 32 }}>🏍️ 💨 💨 🏠</Text>
-        </View>
+        <GearzoMap
+          latitude={(destLat + mechLat) / 2}
+          longitude={(destLng + mechLng) / 2}
+          zoomDelta={0.025}
+          style={StyleSheet.absoluteFillObject}
+          routeCoordinates={[
+            { latitude: mechLat, longitude: mechLng },
+            { latitude: (destLat + mechLat) / 2 + 0.001, longitude: (destLng + mechLng) / 2 },
+            { latitude: destLat, longitude: destLng },
+          ]}
+          markers={[
+            {
+              id: 'mechanic-pos',
+              latitude: mechLat,
+              longitude: mechLng,
+              title: 'Your Position',
+              badgeText: 'You (Mechanic)',
+              iconText: '🏍️',
+              color: '#0B4A27',
+            },
+            {
+              id: 'customer-dest',
+              latitude: destLat,
+              longitude: destLng,
+              title: job?.address || 'Customer Location',
+              badgeText: 'Customer Doorstep',
+              iconText: '📍',
+              color: '#16A34A',
+            },
+          ]}
+        />
 
         <View style={styles.turnCard}>
           <Text style={styles.turnIcon}>📍</Text>
@@ -72,6 +145,9 @@ export default function MechanicNavigateScreen() {
               {job?.address || 'Customer destination'}
             </Text>
           </View>
+          <TouchableOpacity style={styles.openGmapsBtn} onPress={handleOpenGoogleMaps}>
+            <Text style={styles.openGmapsText}>Open Maps ↗</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -137,34 +213,44 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  routeOverlay: {
-    alignItems: 'center',
-  },
   turnCard: {
     position: 'absolute',
-    top: 20,
-    left: 20,
-    right: 20,
+    top: 16,
+    left: 16,
+    right: 16,
     backgroundColor: '#111827',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 14,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    elevation: 6,
   },
   turnIcon: {
-    fontSize: 24,
+    fontSize: 22,
     color: '#22C55E',
   },
   turnDistance: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#9CA3AF',
     fontWeight: '600',
   },
   turnInstruction: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '700',
     color: '#FFFFFF',
     marginTop: 2,
+  },
+  openGmapsBtn: {
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  openGmapsText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   bottomSheet: {
     padding: 20,

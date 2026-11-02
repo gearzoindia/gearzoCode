@@ -11,7 +11,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBookingDetail } from '@gearzo/api-client';
-import { LoadingScreen, ErrorScreen } from '@gearzo/ui';
+import { LoadingScreen, ErrorScreen, GearzoMap } from '@gearzo/ui';
 
 type TrackingPhase = 'ASSIGNED' | 'ON_THE_WAY' | 'ARRIVED';
 
@@ -170,25 +170,39 @@ export default function TrackMechanicScreen() {
           </View>
         </SafeAreaView>
 
-        {/* Map View */}
+        {/* Live Google Map View */}
         <View style={styles.liveMapContainer}>
-          <View style={[styles.mapGridLine, { top: '30%', width: '100%' }]} />
-          <View style={[styles.mapGridLine, { top: '60%', width: '100%' }]} />
-          <View style={[styles.mapGridLineVertical, { left: '30%', height: '100%' }]} />
-          <View style={[styles.mapGridLineVertical, { left: '70%', height: '100%' }]} />
-
-          {/* Route Line */}
-          <View style={styles.dottedRoute} />
-
-          {/* Mechanic Dot "R" */}
-          <View style={styles.mechanicMarkerPin}>
-            <Text style={styles.markerLetter}>R</Text>
-          </View>
-
-          {/* Destination Pin */}
-          <View style={styles.destinationMarkerPin}>
-            <Text style={{ fontSize: 14 }}>📍</Text>
-          </View>
+          <GearzoMap
+            latitude={17.4485}
+            longitude={78.3832}
+            zoomDelta={0.025}
+            style={StyleSheet.absoluteFillObject}
+            routeCoordinates={[
+              { latitude: 17.4412, longitude: 78.3745 },
+              { latitude: 17.4451, longitude: 78.3821 },
+              { latitude: 17.4485, longitude: 78.3908 },
+            ]}
+            markers={[
+              {
+                id: 'mechanic',
+                latitude: 17.4412,
+                longitude: 78.3745,
+                title: mechanic.name,
+                badgeText: `🛵 ${mechanic.name}`,
+                iconText: 'R',
+                color: '#0B4A27',
+              },
+              {
+                id: 'destination',
+                latitude: 17.4485,
+                longitude: 78.3908,
+                title: 'Your Location',
+                badgeText: 'Doorstep',
+                iconText: '📍',
+                color: '#16A34A',
+              },
+            ]}
+          />
         </View>
 
         {/* Bottom Sheet Card */}
@@ -308,9 +322,33 @@ export default function TrackMechanicScreen() {
           onPress={() => setPhase('ON_THE_WAY')}
           activeOpacity={0.9}
         >
-          <View style={styles.mapSnippetRoad} />
-          <View style={styles.mapSnippetPinStart} />
-          <View style={styles.mapSnippetPinEnd} />
+          <GearzoMap
+            latitude={17.4485}
+            longitude={78.3832}
+            zoomDelta={0.03}
+            interactive={false}
+            style={StyleSheet.absoluteFillObject}
+            routeCoordinates={[
+              { latitude: 17.4412, longitude: 78.3745 },
+              { latitude: 17.4485, longitude: 78.3908 },
+            ]}
+            markers={[
+              {
+                id: 'mechanic-preview',
+                latitude: 17.4412,
+                longitude: 78.3745,
+                iconText: 'R',
+                color: '#0B4A27',
+              },
+              {
+                id: 'customer-preview',
+                latitude: 17.4485,
+                longitude: 78.3908,
+                iconText: '📍',
+                color: '#16A34A',
+              },
+            ]}
+          />
           <View style={styles.viewLiveMapOverlay}>
             <Text style={styles.viewLiveMapText}>Tap to View Live Route ›</Text>
           </View>

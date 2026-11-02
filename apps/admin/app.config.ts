@@ -16,12 +16,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     bundleIdentifier: 'in.gearzo.admin',
     supportsTablet: true,
+    config: {
+      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || 'AIzaSyBuAtqTFqh8QMc0hIbAI7MozwGanxKdhQA',
+    },
   },
   android: {
     package: 'in.gearzo.admin',
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#0D3811',
+    },
+    config: {
+      googleMaps: {
+        apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || 'AIzaSyBuAtqTFqh8QMc0hIbAI7MozwGanxKdhQA',
+      },
     },
   },
   web: {

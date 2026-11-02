@@ -16,6 +16,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     bundleIdentifier: 'in.gearzo.customer',
     supportsTablet: true,
+    infoPlist: {
+      NSLocationWhenInUseUsageDescription:
+        'GearZo uses your location to detect your doorstep address and find nearby verified mechanics.',
+    },
+    config: {
+      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || 'AIzaSyBuAtqTFqh8QMc0hIbAI7MozwGanxKdhQA',
+    },
   },
   android: {
     package: 'in.gearzo.customer',
@@ -23,12 +30,34 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#1B5E20',
     },
+    permissions: [
+      'ACCESS_COARSE_LOCATION',
+      'ACCESS_FINE_LOCATION',
+    ],
+    config: {
+      googleMaps: {
+        apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || 'AIzaSyBuAtqTFqh8QMc0hIbAI7MozwGanxKdhQA',
+      },
+    },
   },
   web: {
     favicon: './assets/favicon.png',
     bundler: 'metro',
   },
-  plugins: ['expo-router', 'expo-secure-store', 'expo-location', 'expo-notifications'],
+  plugins: [
+    'expo-router',
+    'expo-secure-store',
+    [
+      'expo-location',
+      {
+        locationAlwaysAndWhenInUsePermission:
+          'Allow GearZo to access your location to detect your doorstep address and track nearby mechanics.',
+        locationWhenInUsePermission:
+          'Allow GearZo to access your location while using the app to detect your doorstep address.',
+      },
+    ],
+    'expo-notifications',
+  ],
   experiments: {
     typedRoutes: true,
   },
