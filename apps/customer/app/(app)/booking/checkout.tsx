@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,13 +12,16 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useVehicles, useCreateBooking, useAuth } from '@gearzo/api-client';
+import * as Location from 'expo-location';
+import { useVehicles, useCreateBooking, useAuth, useAddresses } from '@gearzo/api-client';
+import { reverseGeocodeGoogle } from '@gearzo/ui';
 import { useCartStore } from '../../../stores/cart-store';
 
 export default function CheckoutScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { data: vehicles, isLoading: loadingVehicles } = useVehicles();
+  const { data: addresses } = useAddresses();
 
   const {
     items: cartItems,
@@ -58,8 +61,49 @@ export default function CheckoutScreen() {
   const [inputCoupon, setInputCoupon] = useState('');
   const [couponError, setCouponError] = useState<string | null>(null);
 
-  // Address
-  const addressText = user?.city ? `119–120, Madhapur, ${user.city} 500081` : '119–120, Madhapur, Hyderabad 500081';
+  // Address & Live GPS Auto-Fetch
+  const [liveAddress, setLiveAddress] = useState<string | null>(null);
+  const [liveCoords, setLiveCoords] = useState<{ latitude: number; longitude: number }>({
+    latitude: 17.4485,
+    longitude: 78.3908,
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted' || !mounted) return;
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (!mounted) return;
+        setLiveCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        const geo = await reverseGeocodeGoogle(pos.coords.latitude, pos.coords.longitude);
+        if (mounted && geo && geo.formattedAddress) {
+          setLiveAddress(geo.formattedAddress);
+        }
+      } catch {
+        // Fallback to saved address or user city
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const addressList = Array.isArray(addresses) ? addresses : [];
+  const defaultAddress = addressList.find((a) => a.isDefault) || addressList[0] || null;
+  const savedAddressString = defaultAddress
+    ? [defaultAddress.line1, defaultAddress.line2].filter(Boolean).join(', ')
+    : null;
+
+  const addressText =
+    savedAddressString ||
+    liveAddress ||
+    (user?.city ? `119–120, Madhapur, ${user.city} 500081` : '119–120, Madhapur, Hyderabad 500081');
+  const bookingLat = Number((defaultAddress as any)?.lat || (defaultAddress as any)?.latitude || liveCoords.latitude);
+  const bookingLng = Number((defaultAddress as any)?.lng || (defaultAddress as any)?.longitude || liveCoords.longitude);
 
   // Dates for Screen 11
   const dates = [
@@ -121,8 +165,8 @@ export default function CheckoutScreen() {
         vehicleId: activeVehicle.id,
         scheduledAt: scheduledIso,
         address: addressText,
-        latitude: 17.4485,
-        longitude: 78.3756,
+        latitude: bookingLat,
+        longitude: bookingLng,
         notes: slotInstructions || undefined,
       });
 

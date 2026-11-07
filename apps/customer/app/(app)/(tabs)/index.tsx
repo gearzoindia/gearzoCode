@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,59 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth, useHome, useVehicles, useServices } from '@gearzo/api-client';
-import { LoadingScreen, ErrorScreen } from '@gearzo/ui';
+import * as Location from 'expo-location';
+import { useAuth, useHome, useVehicles, useServices, useAddresses } from '@gearzo/api-client';
+import { LoadingScreen, ErrorScreen, reverseGeocodeGoogle } from '@gearzo/ui';
 
 export default function CustomerHomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { data: homeData, isLoading, isError, refetch, isRefetching } = useHome();
   const { data: vehicles } = useVehicles();
+  const { data: addresses } = useAddresses();
   const { data: quickServices } = useServices('cat_book_mechanic', 'TWO_WHEELER');
+
+  const [detectedLocation, setDetectedLocation] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted' || !mounted) return;
+
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (!mounted) return;
+
+        const googleGeo = await reverseGeocodeGoogle(loc.coords.latitude, loc.coords.longitude);
+        if (mounted && googleGeo && (googleGeo.area || googleGeo.city)) {
+          setDetectedLocation(
+            [googleGeo.area, googleGeo.city].filter(Boolean).join(', ')
+          );
+          return;
+        }
+
+        const nativeGeo = await Location.reverseGeocodeAsync({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+        });
+        if (mounted && nativeGeo && nativeGeo.length > 0) {
+          const item = nativeGeo[0];
+          const label = [item.district || item.subregion || item.street, item.city]
+            .filter(Boolean)
+            .join(', ');
+          if (label) setDetectedLocation(label);
+        }
+      } catch {
+        // Fallback to saved address or user city
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const vehicleList = Array.isArray(vehicles) ? vehicles : [];
   const primaryVehicle =
@@ -25,8 +69,14 @@ export default function CustomerHomeScreen() {
     vehicleList[0] ||
     null;
 
+  const addressList = Array.isArray(addresses) ? addresses : [];
+  const defaultAddress = addressList.find((a) => a.isDefault) || addressList[0] || null;
+  const savedAddressLabel = defaultAddress
+    ? [defaultAddress.line1, defaultAddress.line2].filter(Boolean).join(', ')
+    : null;
+
   const userName = user?.name ? user.name.split(' ')[0] : (user?.phone || 'Customer');
-  const userCity = user?.city || 'Select Location';
+  const userCity = detectedLocation || savedAddressLabel || user?.city || 'Detecting location...';
 
   if (isLoading && !isRefetching) {
     return <LoadingScreen message="Loading GearZo services..." />;

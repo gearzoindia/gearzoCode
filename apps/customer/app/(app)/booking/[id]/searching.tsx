@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, Animated } from 'react
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVehicles, useAuth, useBookingDetail } from '@gearzo/api-client';
+import { GearzoMap } from '@gearzo/ui';
 
 export default function SearchingMechanicScreen() {
   const router = useRouter();
@@ -28,6 +29,8 @@ export default function SearchingMechanicScreen() {
     : 'Immediate Dispatch';
 
   const addressSummary = booking?.address || user?.city || 'Selected Location';
+  const customerLat = Number((booking as any)?.latitude || (booking as any)?.lat || 17.4485);
+  const customerLng = Number((booking as any)?.longitude || (booking as any)?.lng || 78.3908);
 
   const [progress] = useState(new Animated.Value(0.15));
 
@@ -71,15 +74,34 @@ export default function SearchingMechanicScreen() {
         <View style={{ width: 32 }} />
       </View>
 
-      {/* Map Radar Grid Background */}
+      {/* Live Google Map Radar Area */}
       <View style={styles.mapArea}>
-        {/* Radar Rings */}
-        <View style={[styles.radarCircle, { width: 320, height: 320, borderRadius: 160 }]} />
-        <View style={[styles.radarCircle, { width: 220, height: 220, borderRadius: 110 }]} />
-        <View style={[styles.radarCircle, { width: 130, height: 130, borderRadius: 65 }]} />
+        <GearzoMap
+          latitude={customerLat}
+          longitude={customerLng}
+          zoomDelta={0.025}
+          radiusMeters={1200}
+          interactive={false}
+          style={StyleSheet.absoluteFillObject}
+          markers={[
+            {
+              id: 'customer',
+              latitude: customerLat,
+              longitude: customerLng,
+              title: 'Your Location',
+              iconText: '📍',
+              color: '#16A34A',
+            },
+          ]}
+        />
+
+        {/* Radar Rings Overlay */}
+        <View pointerEvents="none" style={[styles.radarCircle, { width: 320, height: 320, borderRadius: 160 }]} />
+        <View pointerEvents="none" style={[styles.radarCircle, { width: 220, height: 220, borderRadius: 110 }]} />
+        <View pointerEvents="none" style={[styles.radarCircle, { width: 130, height: 130, borderRadius: 65 }]} />
 
         {/* Center Pin */}
-        <View style={styles.pinCircle}>
+        <View pointerEvents="none" style={styles.pinCircle}>
           <Text style={{ fontSize: 20 }}>📍</Text>
         </View>
 
@@ -168,8 +190,8 @@ const styles = StyleSheet.create({
   radarCircle: {
     position: 'absolute',
     borderWidth: 2,
-    borderColor: '#A7F3D0',
-    backgroundColor: 'transparent',
+    borderColor: 'rgba(22, 163, 74, 0.35)',
+    backgroundColor: 'rgba(22, 163, 74, 0.05)',
   },
   pinCircle: {
     width: 50,
